@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journey Through Space | Portfolio</title>
+    <meta name="description" content="An immersive 3D portfolio experience - choose your path through the wormhole">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Loading Screen - Fullscreen Terminal -->
+    <div id="loading-screen" class="screen active">
+        <canvas id="matrix-canvas"></canvas>
+        <div class="terminal-fullscreen" id="terminal-output">
+            <!-- Boot sequence will appear here -->
+        </div>
+    </div>
+
+    <!-- 3D Canvas -->
+    <canvas id="canvas"></canvas>
+
+    <!-- UI Overlays -->
+    <div id="ui-container">
+        <!-- Entry Screen / Spaceship Cockpit -->
+        <div id="entry-screen" class="screen">
+            <div class="cockpit-overlay">
+                <div class="cockpit-frame"></div>
+            </div>
+            <div class="title-container">
+                <h1 class="main-title">UDAY GIRISH MARADANA</h1>
+                <p class="subtitle">Machine Learning Engineer | Robotics Researcher</p>
+                <div class="welcome-message">
+                    <p class="welcome-text">Explore my universe</p>
+                    <div class="controls-hint">
+                        <p class="control-item">🖱️ Mouse to look around and steer</p>
+                        <p class="control-item">⬆️ W/S to move forward/backward</p>
+                        <p class="control-item">⬅️ ➡️ A/D to strafe left/right</p>
+                        <p class="control-item">🚀 Space/Shift to thrust up/down</p>
+                        <p class="control-item">Fly close to a wormhole and press W to enter</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HUD Overlay -->
+        <div id="hud" class="hud hidden">
+            <div class="hud-top">
+                <div class="hud-item">
+                    <span class="hud-label">SPEED</span>
+                    <span class="hud-value" id="hud-speed">0.0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">TARGET</span>
+                    <span class="hud-value" id="hud-target">---</span>
+                </div>
+            </div>
+            <div class="hud-bottom">
+                <div class="hud-item">
+                    <span class="hud-label">SECTOR α</span>
+                    <span class="hud-value" id="hud-x">0.000</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">SECTOR β</span>
+                    <span class="hud-value" id="hud-y">0.000</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">SECTOR γ</span>
+                    <span class="hud-value" id="hud-z">-0.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls (auto-hidden on desktop) -->
+        <div id="mobile-controls" class="mobile-only">
+            <!-- Virtual Joystick (Left) -->
+            <div class="joystick-container" id="joystick-container">
+                <div class="joystick-base">
+                    <div class="joystick-stick" id="joystick-stick"></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons (Right) -->
+            <div class="mobile-buttons">
+                <button class="mobile-btn thrust-forward" id="mobile-forward">
+                    <span>⬆</span>
+                </button>
+                <button class="mobile-btn speed-boost" id="mobile-boost">
+                    <span>🚀</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Wormhole Config -->
+    <script src="config.js"></script>
+    <!-- Matrix Effect -->
+    <script src="matrix.js"></script>
+    <!-- HUD & 3D Effects -->
+    <script src="hud.js"></script>
+    <!-- Mobile Controls -->
+    <script src="mobile.js"></script>
+    <!-- Main App -->
+    <script src="app.js"></script>
+</body>
+
+</html>

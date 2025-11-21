@@ -1,0 +1,35 @@
+- name: SolidWorks
+  percentage: 60
+  color: info
+
+- name: Ansys
+  percentage: 20
+  color: danger
+  
+- name: Catia
+  percentage: 40
+  color: danger
+
+- name: Design & Analysis
+  percentage: 60
+  color: info
+
+- name: CREO
+  percentage: 40
+  color: danger
+
+- name: MasterCam
+  percentage: 50
+  color: info
+  
+- name: FluidSim
+  percentage: 80
+  color: success
+
+- name: Matlab
+  percentage: 50
+  color: info
+  
+- name: Proteus
+  percentage: 30
+  color: danger

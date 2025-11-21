@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Universe | Uday Girish</title>
+    <meta name="description" content="Explore my personal universe - creative projects, hobbies, and life beyond code">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="stars-background"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="../index.html?from=personal" class="back-button">
+            <span>←</span>
+            <span>Back to Wormhole</span>
+        </a>
+        <div class="nav-links">
+            <a href="#about">About</a>
+            <a href="#interests">Interests</a>
+            <a href="#projects">Projects</a>
+            <a href="#contact">Contact</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">🌟 Personal Universe</div>
+            <h1 class="hero-title">
+                <span class="gradient-text">Life Beyond</span>
+                <span class="gradient-text">The Code</span>
+            </h1>
+            <p class="hero-subtitle">
+                Where curiosity meets code. Always up for discussions on Robotics, AI, Quantum Physics, Neuroscience &
+                Life!
+            </p>
+            <div class="hero-buttons">
+                <a href="#about" class="btn btn-primary">Explore My World</a>
+                <a href="#contact" class="btn btn-secondary">Get in Touch</a>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <div class="mouse"></div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section about">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">About Me</h2>
+            <div class="about-content">
+                <div class="about-card" data-aos="fade-right">
+                    <div class="card-icon">✨</div>
+                    <h3>Who I Am</h3>
+                    <p>
+                        I turn tea ☕ into code! Beyond my professional work in ML and robotics, I'm fascinated
+                        by the deeper questions - how intelligence emerges, why systems behave the way they do,
+                        and what the future holds at the intersection of quantum computing and AI.
+                    </p>
+                </div>
+                <div class="about-card" data-aos="fade-up">
+                    <div class="card-icon">🎯</div>
+                    <h3>My Philosophy</h3>
+                    <p>
+                        Believe it! ✌️ I'm driven by curiosity and a passion for understanding complex systems.
+                        Whether it's debugging a reinforcement learning algorithm or pondering the nature of
+                        consciousness, I approach problems with both rigor and wonder.
+                    </p>
+                </div>
+                <div class="about-card" data-aos="fade-left">
+                    <div class="card-icon">🚀</div>
+                    <h3>My Journey</h3>
+                    <p>
+                        From building drones and autonomous robots in college to researching cutting-edge ML
+                        at WPI, my path has been fueled by hands-on experimentation and a love for building
+                        intelligent systems that push technological boundaries.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interests Section -->
+    <section id="interests" class="section interests">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">What I Love</h2>
+            <div class="interests-grid">
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="interest-icon">🤖</div>
+                    <h3>Robotics</h3>
+                    <p>Simulations and real-time robotics development with 3D and 2D vision, motion planning, and
+                        autonomous systems.</p>
+                </div>
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="interest-icon">🧠</div>
+                    <h3>Machine Learning</h3>
+                    <p>Traditional and deep learning approaches, always exploring new architectures and optimization
+                        techniques.</p>
+                </div>
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="300">
+                    <div class="interest-icon">🎮</div>
+                    <h3>Reinforcement Learning</h3>
+                    <p>Training agents to learn optimal behaviors through interaction, from games to robotics
+                        applications.</p>
+                </div>
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="400">
+                    <div class="interest-icon">🔍</div>
+                    <h3>Explainable AI</h3>
+                    <p>Making AI decisions interpretable and transparent - understanding not just what models do, but
+                        why.</p>
+                </div>
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="500">
+                    <div class="interest-icon">⚛️</div>
+                    <h3>Quantum Physics & Computing</h3>
+                    <p>Exploring quantum mechanics, quantum algorithms, and the future of computation at the quantum
+                        scale.</p>
+                </div>
+                <div class="interest-card" data-aos="zoom-in" data-aos-delay="600">
+                    <div class="interest-icon">💭</div>
+                    <h3>Philosophy</h3>
+                    <p>Pondering the big questions - consciousness, ethics in AI, and the nature of intelligence and
+                        reality.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Creative Projects Section -->
+    <section id="projects" class="section projects">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Creative Projects</h2>
+            <div class="projects-grid">
+                <div class="project-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="project-image">
+                        <div class="project-overlay">
+                            <span class="project-tag">3D Art</span>
+                        </div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Procedural Worlds</h3>
+                        <p>Exploring procedural generation to create infinite, unique 3D landscapes.</p>
+                    </div>
+                </div>
+                <div class="project-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="project-image">
+                        <div class="project-overlay">
+                            <span class="project-tag">Photography</span>
+                        </div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Urban Nightscapes</h3>
+                        <p>Capturing the beauty of cities at night through long exposure photography.</p>
+                    </div>
+                </div>
+                <div class="project-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="project-image">
+                        <div class="project-overlay">
+                            <span class="project-tag">Music</span>
+                        </div>
+                    </div>
+                    <div class="project-content">
+                        <h3>Cosmic Beats</h3>
+                        <p>Electronic music inspired by space, featuring ambient soundscapes and synth-wave.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section contact">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Let's Connect</h2>
+            <p class="contact-subtitle" data-aos="fade-up" data-aos-delay="100">
+                Interested in collaborating on creative projects or just want to chat? Reach out!
+            </p>
+            <div class="contact-cards">
+                <a href="mailto:your.email@example.com" class="contact-card" data-aos="flip-left" data-aos-delay="100">
+                    <div class="contact-icon">📧</div>
+                    <h3>Email</h3>
+                    <p>einsteingirish@gmail.com</p>
+                </a>
+                <a href="https://twitter.com/yourusername" target="_blank" class="contact-card" data-aos="flip-left"
+                    data-aos-delay="200">
+                    <div class="contact-icon">🐦</div>
+                    <h3>Twitter</h3>
+                    <p>@UdayGirishM</p>
+                </a>
+                <a href="https://instagram.com/yourusername" target="_blank" class="contact-card" data-aos="flip-left"
+                    data-aos-delay="300">
+                    <div class="contact-icon">📷</div>
+                    <h3>Instagram</h3>
+                    <p>@udaygirish</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Uday Girish. Crafted with passion and cosmic energy.</p>
+            <a href="../index.html" class="footer-link">Return to Wormhole</a>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

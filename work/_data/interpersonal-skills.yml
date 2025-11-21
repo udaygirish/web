@@ -1,0 +1,16 @@
+  
+- name: Leadership
+  percentage: 80
+  color: success
+  
+- name: Critical Thinking
+  percentage: 80
+  color: success
+
+- name: Decision-Making
+  percentage: 50
+  color: info
+  
+- name: Problem Solving
+  percentage: 70
+  color: info

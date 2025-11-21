@@ -1,0 +1,23 @@
+- name: ROS
+  percentage: 60
+  color: info 
+
+- name: Aerial Robotics
+  percentage: 60
+  color: info 
+
+- name: Mobile Robotics
+  percentage: 60
+  color: info 
+
+- name: Humanoid Robotics
+  percentage: 70
+  color: info
+
+- name: Underwater Robotics
+  percentage: 20
+  color: danger
+
+- name: IOT
+  percentage: 75
+  color: info

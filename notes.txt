@@ -1,0 +1,23 @@
+# Create a 3d js website such that the entry page should have a wormhole
+
+and then if u enter that we should meet with a T intersection and where we have two wormhole exits
+
+
+the plan is to make a page such that if a user enters my site 
+
+they have two paths to check my personal profile and one side is professional profile 
+
+
+
+im thinking of a pathway like this 
+
+
+---------------------------------------------
+Personal                            Work
+----------------              ----------------
+                -            -
+                 -          -
+                 -          -
+                 -          -
+                 -          -
+                 -          -

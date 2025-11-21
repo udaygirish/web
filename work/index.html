@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Portfolio | Uday Girish Maradana</title>
+    <meta name="description"
+        content="Senior ML Engineer specializing in Machine Learning, MLOps, Robotics, and Computer Vision">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="stars-background"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="../index.html?from=work" class="back-button">
+            <span>←</span>
+            <span>Back to Wormhole</span>
+        </a>
+        <div class="nav-links">
+            <a href="#about">About</a>
+            <a href="#experience">Experience</a>
+            <a href="#skills">Skills</a>
+            <a href="#contact">Contact</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">💼 Professional Portfolio</div>
+            <h1 class="hero-title">
+                <span class="gradient-text typing-text" id="typing-text"></span>
+            </h1>
+            <p class="hero-subtitle">
+                Senior ML Engineer @ webAI | Robotics Researcher | Building Intelligent Autonomous Systems
+            </p>
+            <div class="hero-stats">
+                <div class="stat-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="stat-number">6+</div>
+                    <div class="stat-label">Years Experience</div>
+                </div>
+                <div class="stat-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="stat-number">40+</div>
+                    <div class="stat-label">ML Projects</div>
+                </div>
+                <div class="stat-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Companies</div>
+                </div>
+            </div>
+            <div class="hero-buttons">
+                <a href="#experience" class="btn btn-primary">View My Work</a>
+                <a href="https://github.com/udaygirish/udaygirish.github.io/raw/master/assets/Uday_Girish_Maradana_Resume.pdf"
+                    target="_blank" class="btn btn-secondary">Download CV</a>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <div class="mouse"></div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section about">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">About Me</h2>
+            <div class="about-grid">
+                <div class="about-intro" data-aos="fade-right">
+                    <h3>Machine Learning Engineer & Robotics Researcher</h3>
+                    <p>
+                        I'm currently a Senior Machine Learning Engineer at webAI, where I build and scale ML solutions
+                        for production systems. My expertise spans Machine Learning, Deep Learning, MLOps, Reinforcement
+                        Learning, and Robotics. With over 6 years of experience across industry and research, I've
+                        developed end-to-end ML solutions that bridge cutting-edge research and real-world applications.
+                    </p>
+                    <p>
+                        My journey includes leading MLOps framework development on AWS and GCP, building computer vision
+                        pipelines for autonomous systems, deploying models on edge devices (Jetson, Raspberry Pi), and
+                        conducting robotics research at WPI. I'm passionate about Explainable AI, Quantum Computing, and
+                        Philosophy - always seeking to understand not just how systems work, but why.
+                    </p>
+                    <div class="expertise-tags">
+                        <span class="tag">Machine Learning</span>
+                        <span class="tag">MLOps</span>
+                        <span class="tag">Robotics</span>
+                        <span class="tag">Computer Vision</span>
+                        <span class="tag">Deep Learning</span>
+                        <span class="tag">Cloud (AWS/GCP)</span>
+                    </div>
+                </div>
+                <div class="about-highlights" data-aos="fade-left">
+                    <div class="highlight-card">
+                        <div class="highlight-icon">🎯</div>
+                        <h4>Mission</h4>
+                        <p>Build intelligent systems that solve real-world problems through innovative AI solutions.</p>
+                    </div>
+                    <div class="highlight-card">
+                        <div class="highlight-icon">💡</div>
+                        <h4>Approach</h4>
+                        <p>Research-driven development, scalable architecture, and continuous experimentation.</p>
+                    </div>
+                    <div class="highlight-card">
+                        <div class="highlight-icon">🚀</div>
+                        <h4>Focus</h4>
+                        <p>End-to-end ML platforms, edge computing, autonomous systems, and explainable AI.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Experience Section -->
+    <section id="experience" class="section experience">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Professional Journey</h2>
+            <div class="timeline">
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="100">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">May 2025 - Present</div>
+                        <h3>Senior Machine Learning Engineer</h3>
+                        <h4>webAI</h4>
+                        <p>
+                            Building and scaling ML solutions for webAI's platform. Developing production-ready ML
+                            systems
+                            and infrastructure that power intelligent applications at scale.
+                        </p>
+                        <div class="tech-stack">
+                            <span>Python</span>
+                            <span>TensorFlow</span>
+                            <span>PyTorch</span>
+                            <span>MLOps</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="150">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">Jan 2024 - May 2025</div>
+                        <h3>Graduate Researcher</h3>
+                        <h4>ELPIS Lab, Worcester Polytechnic Institute</h4>
+                        <p>
+                            Researching end-to-end learning-based approaches for robot grasping and manipulation.
+                            Working on cutting-edge robotics algorithms combining computer vision and reinforcement
+                            learning.
+                        </p>
+                        <div class="tech-stack">
+                            <span>ROS</span>
+                            <span>PyTorch</span>
+                            <span>Computer Vision</span>
+                            <span>Reinforcement Learning</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="200">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">Jun 2024 - Sep 2024</div>
+                        <h3>SDS Intern - LLMs</h3>
+                        <h4>Johnson & Johnson</h4>
+                        <p>
+                            Developed Large Language Model pipelines for clinical data analysis. Built scalable NLP
+                            solutions
+                            for healthcare applications, working with sensitive medical data and ensuring compliance.
+                        </p>
+                        <div class="tech-stack">
+                            <span>LLMs</span>
+                            <span>NLP</span>
+                            <span>Python</span>
+                            <span>Transformers</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="250">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">Aug 2023 - Feb 2024</div>
+                        <h3>Graduate Researcher</h3>
+                        <h4>Perception and Autonomous Robotics Group, WPI</h4>
+                        <p>
+                            Built end-to-end pipeline for optical flow based on uncertainty to enable quadrotor obstacle
+                            avoidance. Developed real-time computer vision algorithms for autonomous navigation.
+                        </p>
+                        <div class="tech-stack">
+                            <span>Computer Vision</span>
+                            <span>Optical Flow</span>
+                            <span>Robotics</span>
+                            <span>C++</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="300">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">Jan 2022 - Jul 2023</div>
+                        <h3>Machine Learning Engineer</h3>
+                        <h4>Tiger Analytics</h4>
+                        <p>
+                            Led team developing scalable MLOps frameworks on AWS and GCP. Built unified data science
+                            platforms,
+                            price elasticity pipelines with Pyspark, and IoT-CV architectures. Achieved 75% reduction in
+                            model
+                            deployment time and 50% improvement in training efficiency.
+                        </p>
+                        <div class="tech-stack">
+                            <span>AWS Sagemaker</span>
+                            <span>GCP Vertex AI</span>
+                            <span>PySpark</span>
+                            <span>MLOps</span>
+                            <span>Docker</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="350">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">Feb 2021 - Jul 2021</div>
+                        <h3>Machine Learning Engineer II</h3>
+                        <h4>New Space Research & Technologies</h4>
+                        <p>
+                            Developed deep learning-based computer vision pipelines for targeting and navigation in
+                            autonomous
+                            systems. Led platform migration from Raspberry Pi to Jetson NX, exploring OpenVINO,
+                            TensorRT, and
+                            Deepstream for model optimization.
+                        </p>
+                        <div class="tech-stack">
+                            <span>Computer Vision</span>
+                            <span>Jetson</span>
+                            <span>TensorRT</span>
+                            <span>SLAM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-aos="fade-up" data-aos-delay="400">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">May 2019 - Feb 2021</div>
+                        <h3>Machine Learning Engineer</h3>
+                        <h4>Quantiphi</h4>
+                        <p>
+                            Developed CV solutions for safety monitoring, suspect search, document classification with
+                            transformers,
+                            and translation services. Worked on hybrid deployment scenarios using NVIDIA Deepstream,
+                            TensorFlow Lite,
+                            and explored federated learning.
+                        </p>
+                        <div class="tech-stack">
+                            <span>Computer Vision</span>
+                            <span>Transformers</span>
+                            <span>Kubeflow</span>
+                            <span>GCP</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills" class="section skills">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Technical Skills</h2>
+            <div class="skills-grid">
+                <div class="skill-category" data-aos="fade-up" data-aos-delay="100">
+                    <h3>AI & Machine Learning</h3>
+                    <div class="skill-bars">
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Machine Learning</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Deep Learning</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Computer Vision</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="70">
+                            <div class="skill-info">
+                                <span>TensorFlow</span>
+                                <span class="skill-percentage">70%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="50">
+                            <div class="skill-info">
+                                <span>PyTorch</span>
+                                <span class="skill-percentage">50%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>OpenCV</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="60">
+                            <div class="skill-info">
+                                <span>NLP</span>
+                                <span class="skill-percentage">60%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="skill-category" data-aos="fade-up" data-aos-delay="200">
+                    <h3>Programming & Tools</h3>
+                    <div class="skill-bars">
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Python</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="50">
+                            <div class="skill-info">
+                                <span>C / C++</span>
+                                <span class="skill-percentage">50%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="60">
+                            <div class="skill-info">
+                                <span>SQL</span>
+                                <span class="skill-percentage">60%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Scikit-Learn</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="75">
+                            <div class="skill-info">
+                                <span>Data Visualization</span>
+                                <span class="skill-percentage">75%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="70">
+                            <div class="skill-info">
+                                <span>Git & Version Control</span>
+                                <span class="skill-percentage">70%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="skill-category" data-aos="fade-up" data-aos-delay="300">
+                    <h3>Cloud & Deployment</h3>
+                    <div class="skill-bars">
+                        <div class="skill-bar" data-progress="75">
+                            <div class="skill-info">
+                                <span>AWS (Sagemaker, EC2, S3)</span>
+                                <span class="skill-percentage">75%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="70">
+                            <div class="skill-info">
+                                <span>GCP (Vertex AI, Composer)</span>
+                                <span class="skill-percentage">70%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>Edge Computing</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="65">
+                            <div class="skill-info">
+                                <span>Docker & Kubernetes</span>
+                                <span class="skill-percentage">65%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="80">
+                            <div class="skill-info">
+                                <span>TFLite / TFJS</span>
+                                <span class="skill-percentage">80%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="skill-bar" data-progress="70">
+                            <div class="skill-info">
+                                <span>MLOps & CI/CD</span>
+                                <span class="skill-percentage">70%</span>
+                            </div>
+                            <div class="skill-progress">
+                                <div class="skill-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section contact">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Let's Work Together</h2>
+            <p class="contact-subtitle" data-aos="fade-up" data-aos-delay="100">
+                Interested in collaborating on ML/Robotics projects? Let's connect!
+            </p>
+            <div class="contact-grid">
+                <div class="contact-info" data-aos="fade-right">
+                    <div class="info-item">
+                        <div class="info-icon">📧</div>
+                        <div>
+                            <h4>Email</h4>
+                            <a href="mailto:einsteingirish@gmail.com">einsteingirish@gmail.com</a>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon">💼</div>
+                        <div>
+                            <h4>LinkedIn</h4>
+                            <a href="https://linkedin.com/in/udaygirish-maradana"
+                                target="_blank">linkedin.com/in/udaygirish-maradana</a>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon">🐙</div>
+                        <div>
+                            <h4>GitHub</h4>
+                            <a href="https://github.com/udaygirish" target="_blank">github.com/udaygirish</a>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-icon">🐦</div>
+                        <div>
+                            <h4>Twitter</h4>
+                            <a href="https://twitter.com/UdayGirishM" target="_blank">@UdayGirishM</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-cta" data-aos="fade-left">
+                    <h3>Ready to Start?</h3>
+                    <p>I'm available for consulting, collaborations, and full-time opportunities in ML Engineering and
+                        Robotics.</p>
+                    <div class="cta-buttons">
+                        <a href="mailto:einsteingirish@gmail.com" class="btn btn-primary">Send Email</a>
+                        <a href="https://github.com/udaygirish/udaygirish.github.io/raw/master/assets/Uday_Girish_Maradana_Resume.pdf"
+                            target="_blank" class="btn btn-secondary">Download CV</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Uday Girish Maradana. Turning tea ☕ into code. Believe It! ✌️</p>
+            <div class="footer-links">
+                <a href="../index.html">Return to Wormhole</a>
+                <a href="#hero">Back to Top</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

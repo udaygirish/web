@@ -1,0 +1,23 @@
+- name: Cloud Computing
+  percentage: 80
+  color: success
+
+- name: GCP
+  percentage: 90
+  color: success
+
+- name: AWS
+  percentage: 80
+  color: success
+
+- name: Network Security
+  percentage: 50
+  color: info
+
+- name: Github
+  percentage: 80
+  color: success
+
+- name: Jenkins
+  percentage: 50
+  color: info

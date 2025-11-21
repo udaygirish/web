@@ -1,0 +1,101 @@
+### Site Settings ###
+title               : Uday Girish Maradana
+description         : >- 
+                      I turn tea :tea: into code,     
+                      Want to discuss ?? Always up for Robotics, Artificial Intelligence, Quantum Physics, Neuroscience & Life!!!                  
+                      Believe It! :v:
+baseurl             : ""                     # Change to empty quotes if you are hosting your site at <your-username>.github.io directly
+repository          : udaygirish/udaygirish.github.io     # Change to <your-username>/<your-username>.github.io (or remove it if you don't need remote projects)
+remote_theme        : udaygirish/portfolYOU
+
+
+### Plugins ###
+plugins:
+  - jemoji
+
+
+### Navbar Settings ###
+nav_exclude:                                            # The following paths are excluded from navbar
+  - pages/tags.html
+  - pages/404.html
+  - pages/index.md
+  - pages/testblog.md
+  - pages/fquotes.md
+  - pages/status.md
+  - pages/contact.md
+  - pages/projects.html
+
+  #  - pages/contact.html
+
+### Author Info ###
+author:
+  name              : Uday Girish Maradana
+  image             : ./assets/uday.png
+# behance           : your_username
+# dribbble          : your_username
+  email             : einsteingirish@gmail.com  
+# facebook          : your_username
+  github            : udaygirish
+# gitlab            : your_username
+  instagram         : udaygirish
+  kaggle            : udaygirish
+  linkedin          : udaygirish-maradana
+  medium            : udaygirish
+# soundcloud        : your_username
+# spotify           : your_username
+# stackoverflow     : your_user_id
+# tumblr            : your_username.tumblr.com
+# twitch            : your_username
+  twitter           : UdayGirishM
+# vimeo             : your_username
+# youtube           : your_channel_name
+  quora             : Uday-Girish-Maradana
+# resume            : Uday_Girish_Maradana_Resume.pdf
+  cv                : Uday_Girish_Maradana_Resume.pdf
+  
+
+### Posts ###
+permalink: /blog/:title
+
+
+### Collections ###
+collections:
+  projects:
+    output: true
+    permalink: /projects/:name
+
+### Disqus ###                        
+disqus:        # Your website Shortname on disqus
+  shortname: https-udaygirish-github-io  
+
+### Analytics ###
+analytics:
+  enabled: true                                        # Set true to enable analytics
+  google:
+    tracking_id: UA-175164060-1
+
+
+### Defaults for collections ###
+defaults:
+  - scope:
+      path: ""
+      type: "projects"
+    values:
+      layout: "page"
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      comments: true                                  # Set to true to enable disqus comments
+  - scope:
+      path: ""
+      type: "skills"
+    values:
+      comments: false 
+
+### Exclude from processing ###
+exclude:
+  - README.md
+  - CONTRIBUTING.md
+  - LICENSE
+  - "*.log"
