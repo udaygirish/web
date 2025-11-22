@@ -299,3 +299,39 @@ body {
     color: #ffffff;
     background: rgba(255, 255, 255, 0.1);
 }
+
+/* Construction Warning */
+.construction-warning {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 165, 0, 0.2);
+    border: 2px solid #ff9e3d;
+    color: #ff9e3d;
+    padding: 20px 40px;
+    border-radius: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    text-shadow: 0 0 10px rgba(255, 158, 61, 0.5);
+    box-shadow: 0 0 30px rgba(255, 158, 61, 0.2);
+    backdrop-filter: blur(5px);
+}
+
+.construction-warning.visible {
+    opacity: 1;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0% { box-shadow: 0 0 30px rgba(255, 158, 61, 0.2); }
+    50% { box-shadow: 0 0 50px rgba(255, 158, 61, 0.5); }
+    100% { box-shadow: 0 0 30px rgba(255, 158, 61, 0.2); }
+}

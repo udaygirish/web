@@ -126,99 +126,135 @@ function createStarfield() {
 function createSolarSystems() {
     const systems = [
         {
-            name: 'Education',
-            position: { x: -200, y: 0, z: -300 },
-            starColor: 0x4361ee,
-            planets: [
-                {
-                    name: 'University', orbit: 40, size: 8, color: 0x4361ee, speed: 0.0008, content: {
-                        title: 'University Degree',
-                        description: 'Bachelor of Science in Computer Science',
-                        details: ['GPA: 3.8/4.0', 'ML & Robotics Focus', 'Graduated 2023']
-                    }
-                },
-                {
-                    name: 'Courses', orbit: 60, size: 6, color: 0x5a7fd8, speed: 0.0006, content: {
-                        title: 'Online Certifications',
-                        description: 'Continuous learning through specialized courses',
-                        details: ['Deep Learning', 'Advanced Robotics', 'Cloud Architecture']
-                    }
-                }
-            ]
-        },
-        {
             name: 'Experience',
-            position: { x: 200, y: 0, z: -300 },
+            position: { x: 0, y: 0, z: 0 }, // Center system
             starColor: 0xf77f00,
+            hasPath: true, // Enable sequential path for this system
             planets: [
                 {
-                    name: 'Current Role', orbit: 35, size: 9, color: 0xf77f00, speed: 0.0009, content: {
-                        title: 'ML Engineer',
-                        description: 'Leading machine learning projects',
-                        details: ['Production ML pipelines', 'Computer vision research', 'Team collaboration']
+                    name: 'Quantiphi', orbit: 30, size: 6, color: 0xff9e3d, speed: 0.0012, sequence: 1, content: {
+                        title: 'Machine Learning Engineer',
+                        description: 'Quantiphi (May 2019 - Feb 2021)',
+                        details: ['CV solutions for safety monitoring', 'Document classification with Transformers', 'Federated Learning exploration']
                     }
                 },
                 {
-                    name: 'Previous', orbit: 55, size: 7, color: 0xff9e3d, speed: 0.0007, content: {
-                        title: 'Robotics Intern',
-                        description: 'Autonomous navigation systems',
-                        details: ['ROS development', 'Path planning', 'Sensor fusion']
+                    name: 'New Space', orbit: 45, size: 6.5, color: 0xffb366, speed: 0.0010, sequence: 2, content: {
+                        title: 'ML Engineer II',
+                        description: 'New Space Research (Feb 2021 - Jul 2021)',
+                        details: ['Deep learning for autonomous navigation', 'Jetson NX optimization', 'TensorRT & Deepstream']
                     }
                 },
                 {
-                    name: 'Research', orbit: 75, size: 6.5, color: 0xffb366, speed: 0.0005, content: {
-                        title: 'Research Assistant',
-                        description: 'ML research in academia',
-                        details: ['Published 2 papers', 'Computer vision', 'Collaborated with professors']
+                    name: 'Tiger Analytics', orbit: 60, size: 7, color: 0xf77f00, speed: 0.0009, sequence: 3, content: {
+                        title: 'Machine Learning Engineer',
+                        description: 'Tiger Analytics (Jan 2022 - Jul 2023)',
+                        details: ['Scalable MLOps on AWS/GCP', 'Unified data science platforms', '75% reduction in deployment time']
+                    }
+                },
+                {
+                    name: 'WPI Perception', orbit: 75, size: 6, color: 0xffcc80, speed: 0.0008, sequence: 4, content: {
+                        title: 'Graduate Researcher',
+                        description: 'WPI Perception Group (Aug 2023 - Feb 2024)',
+                        details: ['Optical flow for quadrotors', 'Real-time CV algorithms', 'Autonomous navigation']
+                    }
+                },
+                {
+                    name: 'J&J', orbit: 90, size: 7.5, color: 0xff6b6b, speed: 0.0007, sequence: 5, content: {
+                        title: 'SDS Intern - LLMs',
+                        description: 'Johnson & Johnson (Jun 2024 - Sep 2024)',
+                        details: ['LLM pipelines for clinical data', 'Scalable NLP solutions', 'Healthcare data compliance']
+                    }
+                },
+                {
+                    name: 'WPI ELPIS', orbit: 105, size: 6.5, color: 0xffab91, speed: 0.0006, sequence: 6, content: {
+                        title: 'Graduate Researcher',
+                        description: 'ELPIS Lab (Jan 2024 - May 2025)',
+                        details: ['Robot grasping & manipulation', 'Reinforcement Learning', 'End-to-end robotics algorithms']
+                    }
+                },
+                {
+                    name: 'webAI', orbit: 120, size: 9, color: 0xff5722, speed: 0.0005, sequence: 7, content: {
+                        title: 'Senior ML Engineer',
+                        description: 'webAI (May 2025 - Present)',
+                        details: ['Production ML pipelines', 'Scaling intelligent applications', 'Computer Vision research']
                     }
                 }
             ]
         },
         {
             name: 'Skills',
-            position: { x: -200, y: -80, z: -500 },
+            position: { x: -250, y: 50, z: -200 },
             starColor: 0x06ffa5,
             planets: [
                 {
-                    name: 'Programming', orbit: 33, size: 8.5, color: 0x06ffa5, speed: 0.001, content: {
-                        title: 'Programming Languages',
-                        description: 'Proficient in multiple languages',
-                        details: ['Python (Expert)', 'C++ (Advanced)', 'JavaScript']
+                    name: 'AI & ML', orbit: 40, size: 8.5, color: 0x06ffa5, speed: 0.001, content: {
+                        title: 'AI & Machine Learning',
+                        description: 'Core expertise',
+                        details: ['Deep Learning', 'Computer Vision', 'TensorFlow & PyTorch', 'Reinforcement Learning']
                     }
                 },
                 {
-                    name: 'ML Frameworks', orbit: 52, size: 7.5, color: 0x2bffc1, speed: 0.0008, content: {
-                        title: 'ML Frameworks',
-                        description: 'Experience with leading frameworks',
-                        details: ['TensorFlow', 'PyTorch', 'Scikit-learn']
+                    name: 'Programming', orbit: 60, size: 7.5, color: 0x2bffc1, speed: 0.0008, content: {
+                        title: 'Programming',
+                        description: 'Languages & Logic',
+                        details: ['Python (Expert)', 'C++ (Advanced)', 'JavaScript', 'SQL']
                     }
                 },
                 {
-                    name: 'Tools', orbit: 70, size: 6.5, color: 0x50ffcd, speed: 0.0006, content: {
-                        title: 'Development Tools',
-                        description: 'Various dev tools and platforms',
-                        details: ['Git & GitHub', 'Docker', 'AWS/GCP']
+                    name: 'Cloud & Ops', orbit: 80, size: 6.5, color: 0x50ffcd, speed: 0.0006, content: {
+                        title: 'Cloud & MLOps',
+                        description: 'Infrastructure & Deployment',
+                        details: ['AWS & GCP', 'Docker & Kubernetes', 'Edge Computing (Jetson)', 'CI/CD']
                     }
                 }
             ]
         },
         {
             name: 'Projects',
-            position: { x: 200, y: -80, z: -500 },
+            position: { x: 250, y: -50, z: -200 },
             starColor: 0x9d4edd,
             planets: [
                 {
-                    name: 'AI Assistant', orbit: 38, size: 8, color: 0x9d4edd, speed: 0.00095, content: {
-                        title: 'AI Personal Assistant',
-                        description: 'Intelligent assistant using NLP',
-                        details: ['Natural language processing', 'Context-aware', 'Multi-platform']
+                    name: 'Procedural', orbit: 40, size: 8, color: 0x9d4edd, speed: 0.0009, content: {
+                        title: 'Procedural Worlds',
+                        description: '3D Art & Generation',
+                        details: ['Infinite landscapes', 'Procedural generation algorithms', '3D rendering']
                     }
                 },
                 {
-                    name: 'Robot Nav', orbit: 58, size: 7, color: 0xb168e8, speed: 0.00075, content: {
-                        title: 'Autonomous Navigation',
-                        description: 'Navigation for mobile robots',
-                        details: ['SLAM implementation', 'Obstacle avoidance', 'ROS-based']
+                    name: 'Nightscapes', orbit: 60, size: 7, color: 0xb168e8, speed: 0.0007, content: {
+                        title: 'Urban Nightscapes',
+                        description: 'Photography',
+                        details: ['Long exposure', 'City lights', 'Urban exploration']
+                    }
+                },
+                {
+                    name: 'Cosmic Beats', orbit: 80, size: 7.5, color: 0xc77dff, speed: 0.0005, content: {
+                        title: 'Cosmic Beats',
+                        description: 'Music Production',
+                        details: ['Space-inspired ambient', 'Synth-wave', 'Electronic music']
+                    }
+                }
+            ]
+        },
+        {
+            name: 'Education',
+            position: { x: 0, y: -150, z: -400 },
+            starColor: 0x4361ee,
+            planets: [
+                {
+                    name: 'WPI', orbit: 50, size: 8, color: 0x4361ee, speed: 0.0008, content: {
+                        title: 'Worcester Polytechnic Institute',
+                        description: 'Master of Science in Robotics',
+                        details: ['GPA: 4.0', 'Focus: AI & Perception', '2023 - 2025']
+                    }
+                },
+                {
+                    name: 'Undergrad', orbit: 70, size: 7, color: 0x5a7fd8, speed: 0.0006, content: {
+                        title: 'Bachelor of Technology',
+                        description: 'Electronics & Communication',
+                        details: ['Robotics Club Lead', 'Best Project Award', '2015 - 2019']
                     }
                 }
             ]
@@ -229,7 +265,39 @@ function createSolarSystems() {
         const system = createSystem(systemData);
         starSystems.push(system);
         scene.add(system.group);
+
+        // Create path if enabled
+        if (systemData.hasPath) {
+            createSystemPath(system);
+        }
     });
+}
+
+function createSystemPath(system) {
+    // Sort planets by sequence
+    const sortedPlanets = system.planets
+        .filter(p => p.userData.sequence)
+        .sort((a, b) => a.userData.sequence - b.userData.sequence);
+
+    if (sortedPlanets.length < 2) return;
+
+    const points = sortedPlanets.map(p => p.position);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+    const material = new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 2,
+        gapSize: 1,
+        opacity: 0.3,
+        transparent: true
+    });
+
+    const line = new THREE.Line(geometry, material);
+    line.computeLineDistances(); // Required for dashed lines
+
+    system.group.add(line);
+    system.pathLine = line;
+    system.sortedPlanets = sortedPlanets;
 }
 
 function createSystem(data) {
@@ -267,6 +335,7 @@ function createSystem(data) {
         planet.userData.angle = Math.random() * Math.PI * 2;
         planet.userData.content = planetData.content;
         planet.userData.systemName = data.name;
+        planet.userData.sequence = planetData.sequence; // Store sequence for path
 
         planet.position.x = Math.cos(planet.userData.angle) * planetData.orbit;
         planet.position.z = Math.sin(planet.userData.angle) * planetData.orbit;
@@ -279,8 +348,20 @@ function createSystem(data) {
     return {
         group: group,
         planets: systemPlanets,
-        name: data.name
+        name: data.name,
+        hasPath: data.hasPath
     };
+}
+
+function updateSystemPaths() {
+    starSystems.forEach(system => {
+        if (system.pathLine && system.sortedPlanets) {
+            const points = system.sortedPlanets.map(p => p.position);
+            system.pathLine.geometry.setFromPoints(points);
+            system.pathLine.computeLineDistances(); // Recompute for dashed effect
+            system.pathLine.geometry.attributes.position.needsUpdate = true;
+        }
+    });
 }
 
 function createPlanet(data) {
@@ -491,6 +572,9 @@ function animate() {
     // Check proximity to systems
     updateSystemInfo();
 
+    // Update sequential paths
+    updateSystemPaths();
+
     renderer.render(scene, camera);
 }
 
@@ -551,7 +635,20 @@ function setupEventListeners() {
 
     window.addEventListener('keydown', (e) => {
         switch (e.key.toLowerCase()) {
-            case 'w': controls.forward = true; break;
+            case 'w':
+                controls.forward = true;
+                // Show construction warning on first move
+                if (!window.hasShownWarning) {
+                    const warning = document.getElementById('constructionWarning');
+                    warning.classList.add('visible');
+                    window.hasShownWarning = true;
+
+                    // Hide after 3 seconds
+                    setTimeout(() => {
+                        warning.classList.remove('visible');
+                    }, 3000);
+                }
+                break;
             case 's': controls.backward = true; break;
             case 'a': controls.left = true; break;
             case 'd': controls.right = true; break;
@@ -685,18 +782,61 @@ function onCanvasClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
-    const intersects = raycaster.intersectObjects(planets, true);
+    // Get all planets and stars
+    const interactables = [];
+    starSystems.forEach(system => {
+        interactables.push(...system.planets);
+        // Add the star mesh (first child of group usually)
+        const star = system.group.children[0];
+        if (star) {
+            star.userData.isStar = true;
+            star.userData.system = system;
+            interactables.push(star);
+        }
+    });
+
+    const intersects = raycaster.intersectObjects(interactables, true);
 
     if (intersects.length > 0) {
-        let selectedPlanet = intersects[0].object;
-        while (selectedPlanet.parent && !selectedPlanet.userData.content) {
-            selectedPlanet = selectedPlanet.parent;
+        let selectedObject = intersects[0].object;
+
+        // Handle Star Click
+        if (selectedObject.userData.isStar || (selectedObject.parent && selectedObject.parent.userData.isStar)) {
+            const system = selectedObject.userData.system || selectedObject.parent.userData.system;
+            showSystemInfo(system);
+            return;
         }
 
-        if (selectedPlanet.userData.content) {
-            showPlanetInfo(selectedPlanet);
+        // Handle Planet Click
+        while (selectedObject.parent && !selectedObject.userData.content) {
+            selectedObject = selectedObject.parent;
+        }
+
+        if (selectedObject.userData.content) {
+            showPlanetInfo(selectedObject);
         }
     }
+}
+
+function showSystemInfo(system) {
+    document.getElementById('planetTitle').textContent = system.name + ' System';
+
+    let description = '';
+    if (system.name === 'Experience') description = 'A journey through my professional career.';
+    if (system.name === 'Skills') description = 'The tools and technologies I master.';
+    if (system.name === 'Projects') description = 'Creative and technical projects.';
+    if (system.name === 'Education') description = 'Academic background and achievements.';
+
+    const contentHTML = `
+        <p>${description}</p>
+        <h3>Planets (In Order)</h3>
+        <ul>
+            ${system.planets.map(p => `<li>${p.userData.content.title}</li>`).join('')}
+        </ul>
+    `;
+
+    document.getElementById('planetContent').innerHTML = contentHTML;
+    document.getElementById('planetPanel').classList.add('active');
 }
 
 function showPlanetInfo(planet) {
