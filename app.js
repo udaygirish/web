@@ -467,46 +467,276 @@ function createWormholes() {
     });
 }
 
+// ========================================
+// Helper Functions for Enhanced Wormhole
+// ========================================
+
+function createSpacetimeGrid(color) {
+    const gridGroup = new THREE.Group();
+
+    // Create two grid planes (top and bottom) - much more subtle
+    const gridSize = 60;      // Reduced from 80 for less dominance
+    const segments = 20;      // Reduced from 30 for sparser grid
+
+    for (let side = 0; side < 2; side++) {
+        const gridGeometry = new THREE.PlaneGeometry(gridSize, gridSize, segments, segments);
+        const positions = gridGeometry.attributes.position;
+
+        // Warp the grid to show gravitational curvature
+        for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i);
+            const y = positions.getY(i);
+            const dist = Math.sqrt(x * x + y * y);
+
+            // Create funnel curve - stronger near center
+            const warpStrength = 15;
+            const warp = warpStrength / (1 + dist * 0.08);
+
+            // Apply warp (negative for top, positive for bottom)
+            const zOffset = side === 0 ? -warp : warp;
+            positions.setZ(i, zOffset);
+        }
+
+        positions.needsUpdate = true;
+
+        // Wireframe material - MUCH more transparent
+        const gridMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.04,         // Dramatically reduced from 0.15 to 0.04
+            blending: THREE.AdditiveBlending
+        });
+
+        const grid = new THREE.Mesh(gridGeometry, gridMaterial);
+        grid.rotation.x = side === 0 ? 0 : Math.PI;
+        grid.name = `grid_${side}`;
+        gridGroup.add(grid);
+    }
+
+    gridGroup.name = 'spacetimeGrid';
+    return gridGroup;
+}
+
+function createEnergyRings(color) {
+    const ringsGroup = new THREE.Group();
+    const numRings = 5;
+
+    for (let i = 0; i < numRings; i++) {
+        const radius = 6 + i * 2.5;
+        const thickness = 0.3 - i * 0.03;
+        const opacity = 0.9 - i * 0.15;
+
+        const ringGeometry = new THREE.TorusGeometry(radius, thickness, 16, 100);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: opacity,
+            blending: THREE.AdditiveBlending
+        });
+
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.name = `energyRing_${i}`;
+        ring.userData.rotationSpeed = 0.01 - i * 0.002; // Slower for outer rings
+        ringsGroup.add(ring);
+    }
+
+    ringsGroup.name = 'energyRings';
+    return ringsGroup;
+}
+
+function createWormholeThroat(color) {
+    // Create hourglass/funnel shape using LatheGeometry
+    const points = [];
+    const segments = 25;
+
+    for (let i = 0; i < segments; i++) {
+        const t = i / (segments - 1);
+        const angle = t * Math.PI;
+
+        // Hourglass curve: wide at ends, narrow in middle
+        const radius = 4 + Math.sin(angle) * 6;
+        const y = (t - 0.5) * 35;
+
+        points.push(new THREE.Vector2(radius, y));
+    }
+
+    const throatGeometry = new THREE.LatheGeometry(points, 32);
+    const throatMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+    });
+
+    const throat = new THREE.Mesh(throatGeometry, throatMaterial);
+    throat.rotation.x = Math.PI / 2;
+    throat.name = 'throat';
+
+    return throat;
+}
+
+function createEventHorizon() {
+    // Black sphere at center
+    const horizonGeometry = new THREE.SphereGeometry(3.5, 32, 32);
+    const horizonMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.98
+    });
+
+    const horizon = new THREE.Mesh(horizonGeometry, horizonMaterial);
+    horizon.name = 'eventHorizon';
+
+    return horizon;
+}
+
+function createLightRays(color) {
+    const raysGroup = new THREE.Group();
+    const numRays = 16;
+
+    for (let i = 0; i < numRays; i++) {
+        const angle = (i / numRays) * Math.PI * 2;
+
+        // Create cone for light ray
+        const rayGeometry = new THREE.ConeGeometry(0.3, 25, 4);
+        const rayMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.08,
+            blending: THREE.AdditiveBlending
+        });
+
+        const ray = new THREE.Mesh(rayGeometry, rayMaterial);
+        ray.rotation.x = Math.PI / 2;
+        ray.rotation.z = angle;
+        ray.position.x = Math.cos(angle) * 10;
+        ray.position.y = Math.sin(angle) * 10;
+        ray.name = `lightRay_${i}`;
+
+        raysGroup.add(ray);
+    }
+
+    raysGroup.name = 'lightRays';
+    return raysGroup;
+}
+
+function createAccretionParticles(color) {
+    const particlesGroup = new THREE.Group();
+    const numParticles = 500; // Increased for denser field
+
+    const positions = new Float32Array(numParticles * 3);
+    const sizes = new Float32Array(numParticles);
+    const opacities = new Float32Array(numParticles);
+
+    for (let i = 0; i < numParticles; i++) {
+        // Distribute particles in a circular disk around the wormhole
+        const angle = Math.random() * Math.PI * 2;
+
+        // Use square root for more uniform circular distribution
+        const maxRadius = 35;
+        const radius = Math.sqrt(Math.random()) * maxRadius;
+
+        // Height varies less at outer edges for disk shape
+        const heightFactor = 1 - (radius / maxRadius) * 0.5;
+        const height = (Math.random() - 0.5) * 10 * heightFactor;
+
+        positions[i * 3] = Math.cos(angle) * radius;
+        positions[i * 3 + 1] = Math.sin(angle) * radius;
+        positions[i * 3 + 2] = height;
+
+        // Size decreases toward edges
+        const distanceFromCenter = radius / maxRadius;
+        sizes[i] = (1 - distanceFromCenter * 0.5) * (Math.random() * 1.5 + 0.5);
+
+        // Opacity fades out smoothly from center to edge (circular fade)
+        // Using exponential falloff for more natural appearance
+        const falloff = Math.pow(1 - distanceFromCenter, 2);
+        opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    particleGeometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
+
+    // Custom shader material for per-particle opacity
+    const particleMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            color: { value: new THREE.Color(color) },
+            pointTexture: { value: null }
+        },
+        vertexShader: `
+            attribute float size;
+            attribute float opacity;
+            varying float vOpacity;
+            
+            void main() {
+                vOpacity = opacity;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = size * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 color;
+            varying float vOpacity;
+            
+            void main() {
+                // Circular particle shape
+                vec2 center = gl_PointCoord - vec2(0.5);
+                float dist = length(center);
+                if (dist > 0.5) discard;
+                
+                // Soft edge
+                float alpha = (1.0 - dist * 2.0) * vOpacity;
+                gl_FragColor = vec4(color, alpha);
+            }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.name = 'accretionParticles';
+    particlesGroup.add(particles);
+
+    particlesGroup.name = 'particles';
+    return particlesGroup;
+}
+
 function createWormholeGroup(color, label) {
     const group = new THREE.Group();
 
-    // Main ring
-    const ringGeo = new THREE.TorusGeometry(8, 0.8, 16, 100);
-    const ringMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.7
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.name = 'ring';
-    group.add(ring);
+    // 1. Spacetime grid showing gravitational warping
+    const grid = createSpacetimeGrid(color);
+    group.add(grid);
 
-    // Glow
-    const glowGeo = new THREE.TorusGeometry(8, 1.5, 16, 100);
-    const glowMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.25,
-        blending: THREE.AdditiveBlending
-    });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.name = 'glow';
-    group.add(glow);
+    // 2. Concentric energy rings
+    const rings = createEnergyRings(color);
+    group.add(rings);
 
-    // Center
-    const centerGeo = new THREE.CircleGeometry(7.5, 64);
-    const centerMat = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 0.95
-    });
-    const center = new THREE.Mesh(centerGeo, centerMat);
-    center.name = 'center';
-    group.add(center);
+    // 3. Funnel/throat geometry
+    const throat = createWormholeThroat(color);
+    group.add(throat);
 
-    // Label
+    // 4. Event horizon (black hole center)
+    const eventHorizon = createEventHorizon();
+    group.add(eventHorizon);
+
+    // 5. Light rays emanating from center
+    const lightRays = createLightRays(color);
+    group.add(lightRays);
+
+    // 6. Accretion disk particles
+    const particles = createAccretionParticles(color);
+    group.add(particles);
+
+    // 7. Label
     const labelSprite = createTextLabel(label, color);
-    labelSprite.position.y = 12;
+    labelSprite.position.y = 18;
     group.add(labelSprite);
 
     return group;
@@ -656,13 +886,112 @@ function checkWormholeProximity() {
 }
 
 function animateWormholes() {
-    wormholes.forEach((wormhole, index) => {
-        wormhole.group.rotation.z += 0.005;
+    const time = Date.now() * 0.001;
 
-        const scale = 1 + Math.sin(Date.now() * 0.001 + index * Math.PI) * 0.05;
-        wormhole.group.scale.set(scale, scale, scale);
+    wormholes.forEach((wormhole, wormholeIndex) => {
+        // Overall gentle rotation
+        wormhole.group.rotation.z += 0.002;
+
+        // Gentle breathing scale
+        const baseScale = 1 + Math.sin(time * 0.5 + wormholeIndex * Math.PI) * 0.03;
+        wormhole.group.scale.set(baseScale, baseScale, baseScale);
+
+        // Animate energy rings - rotate at different speeds
+        const energyRings = wormhole.group.getObjectByName('energyRings');
+        if (energyRings) {
+            energyRings.children.forEach((ring, ringIndex) => {
+                // Each ring rotates at its own speed (stored in userData)
+                if (ring.userData.rotationSpeed) {
+                    ring.rotation.z += ring.userData.rotationSpeed;
+                }
+
+                // Subtle pulsing opacity
+                const pulseFactor = Math.sin(time * 2 + ringIndex * 0.5) * 0.1;
+                if (ring.material) {
+                    const baseOpacity = 0.9 - ringIndex * 0.15;
+                    ring.material.opacity = baseOpacity + pulseFactor;
+                }
+            });
+        }
+
+        // Animate light rays - slow rotation
+        const lightRays = wormhole.group.getObjectByName('lightRays');
+        if (lightRays) {
+            lightRays.rotation.z += 0.005;
+
+            // Pulse light ray opacity
+            lightRays.children.forEach((ray, rayIndex) => {
+                if (ray.material) {
+                    const pulse = Math.sin(time * 3 + rayIndex * 0.2) * 0.03;
+                    ray.material.opacity = 0.08 + pulse;
+                }
+            });
+        }
+
+        // Animate particles - spiral motion
+        const particlesGroup = wormhole.group.getObjectByName('particles');
+        if (particlesGroup) {
+            const particles = particlesGroup.getObjectByName('accretionParticles');
+            if (particles && particles.geometry) {
+                const positions = particles.geometry.attributes.position.array;
+                const opacities = particles.geometry.attributes.opacity ? particles.geometry.attributes.opacity.array : null;
+                const maxRadius = 35;
+
+                for (let i = 0; i < positions.length / 3; i++) {
+                    const i3 = i * 3;
+                    const x = positions[i3];
+                    const y = positions[i3 + 1];
+
+                    // Calculate current angle and radius
+                    let angle = Math.atan2(y, x);
+                    let radius = Math.sqrt(x * x + y * y);
+
+                    // Rotate particles (spiral effect)
+                    angle += 0.01;
+
+                    // Slowly pull toward center
+                    radius -= 0.02;
+
+                    // Reset if too close to center
+                    if (radius < 8) {
+                        radius = Math.sqrt(Math.random()) * maxRadius;
+                        angle = Math.random() * Math.PI * 2;
+
+                        // Recalculate opacity for new position
+                        if (opacities) {
+                            const distanceFromCenter = radius / maxRadius;
+                            const falloff = Math.pow(1 - distanceFromCenter, 2);
+                            opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+                        }
+                    }
+
+                    // Update positions
+                    positions[i3] = Math.cos(angle) * radius;
+                    positions[i3 + 1] = Math.sin(angle) * radius;
+                }
+
+                particles.geometry.attributes.position.needsUpdate = true;
+                if (opacities) {
+                    particles.geometry.attributes.opacity.needsUpdate = true;
+                }
+            }
+        }
+
+        // Animate spacetime grid - fixed opacity to prevent blinking
+        const grid = wormhole.group.getObjectByName('spacetimeGrid');
+        if (grid) {
+            // Grid no longer pulses to prevent blinking effect
+            // Opacity remains constant at 0.04
+        }
+
+        // Animate throat - gentle rotation
+        const throat = wormhole.group.getObjectByName('throat');
+        if (throat) {
+            throat.rotation.z += 0.003;
+        }
     });
 
+    // Rotate starfield
     if (stars) {
         stars.rotation.y += 0.0003;
     }
