@@ -48,6 +48,17 @@ function updateHUD() {
             } else {
                 hudDistance.classList.remove('hud-target-lock');
             }
+
+            // Warning for My World View
+            const hudTarget = document.getElementById('hud-target');
+            if (nearest.id === 'my_world_view') {
+                hudTarget.textContent += ' [⚠️ CONSTRUCTION ZONE]';
+                hudTarget.style.color = '#ff9e3d';
+                hudTarget.classList.add('warning-pulse');
+            } else {
+                hudTarget.style.color = ''; // Reset color
+                hudTarget.classList.remove('warning-pulse');
+            }
         }
 
         // Check if in deep space - only sides, up/down, or way behind wormholes

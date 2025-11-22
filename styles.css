@@ -1279,3 +1279,15 @@ body {
     display: block;
 }
 
+
+/* Warning Pulse Animation */
+@keyframes warningPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.warning-pulse {
+    animation: warningPulse 1s infinite;
+    font-weight: bold;
+}

@@ -575,6 +575,9 @@ function animate() {
     // Update sequential paths
     updateSystemPaths();
 
+    // Update Info Card Position
+    updateInfoCardPosition();
+
     renderer.render(scene, camera);
 }
 
@@ -607,6 +610,27 @@ function updateMovement() {
     }
 }
 
+let selectedObject = null;
+
+function updateInfoCardPosition() {
+    const card = document.getElementById('planetInfoCard');
+    if (!selectedObject || !card.classList.contains('active')) return;
+
+    // Get position of the object
+    const position = new THREE.Vector3();
+    selectedObject.getWorldPosition(position);
+
+    // Project to 2D screen space
+    position.project(camera);
+
+    const x = (position.x * .5 + .5) * window.innerWidth;
+    const y = (-(position.y * .5) + .5) * window.innerHeight;
+
+    // Update card position
+    card.style.left = `${x}px`;
+    card.style.top = `${y}px`;
+}
+
 function updateSystemInfo() {
     let nearestSystem = null;
     let minDistance = Infinity;
@@ -637,9 +661,11 @@ function setupEventListeners() {
         switch (e.key.toLowerCase()) {
             case 'w':
                 controls.forward = true;
+
                 // Show construction warning on first move
-                if (!window.hasShownWarning) {
-                    const warning = document.getElementById('constructionWarning');
+                const warning = document.getElementById('constructionWarning');
+                if (warning && !window.hasShownWarning) {
+                    console.log('Triggering construction warning'); // Debug
                     warning.classList.add('visible');
                     window.hasShownWarning = true;
 
@@ -721,9 +747,10 @@ function setupEventListeners() {
     // Mouse click to select planet
     canvas.addEventListener('click', onCanvasClick);
 
-    // Close panel
-    document.getElementById('closeBtn').addEventListener('click', () => {
-        document.getElementById('planetPanel').classList.remove('active');
+    // Close card
+    document.getElementById('closeCardBtn').addEventListener('click', () => {
+        document.getElementById('planetInfoCard').classList.remove('active');
+        selectedObject = null;
     });
 }
 
@@ -798,28 +825,34 @@ function onCanvasClick(event) {
     const intersects = raycaster.intersectObjects(interactables, true);
 
     if (intersects.length > 0) {
-        let selectedObject = intersects[0].object;
+        let object = intersects[0].object;
 
         // Handle Star Click
-        if (selectedObject.userData.isStar || (selectedObject.parent && selectedObject.parent.userData.isStar)) {
-            const system = selectedObject.userData.system || selectedObject.parent.userData.system;
+        if (object.userData.isStar || (object.parent && object.parent.userData.isStar)) {
+            const system = object.userData.system || object.parent.userData.system;
+            selectedObject = system.group.children[0]; // Track the star mesh
             showSystemInfo(system);
             return;
         }
 
         // Handle Planet Click
-        while (selectedObject.parent && !selectedObject.userData.content) {
-            selectedObject = selectedObject.parent;
+        while (object.parent && !object.userData.content) {
+            object = object.parent;
         }
 
-        if (selectedObject.userData.content) {
-            showPlanetInfo(selectedObject);
+        if (object.userData.content) {
+            selectedObject = object; // Track the planet group
+            showPlanetInfo(object);
         }
+    } else {
+        // Clicked empty space - close card
+        document.getElementById('planetInfoCard').classList.remove('active');
+        selectedObject = null;
     }
 }
 
 function showSystemInfo(system) {
-    document.getElementById('planetTitle').textContent = system.name + ' System';
+    document.getElementById('cardTitle').textContent = system.name + ' System';
 
     let description = '';
     if (system.name === 'Experience') description = 'A journey through my professional career.';
@@ -835,14 +868,14 @@ function showSystemInfo(system) {
         </ul>
     `;
 
-    document.getElementById('planetContent').innerHTML = contentHTML;
-    document.getElementById('planetPanel').classList.add('active');
+    document.getElementById('cardContent').innerHTML = contentHTML;
+    document.getElementById('planetInfoCard').classList.add('active');
 }
 
 function showPlanetInfo(planet) {
     const content = planet.userData.content;
 
-    document.getElementById('planetTitle').textContent = content.title;
+    document.getElementById('cardTitle').textContent = content.title;
 
     const contentHTML = `
         <p>${content.description}</p>
@@ -852,8 +885,8 @@ function showPlanetInfo(planet) {
         </ul>
     `;
 
-    document.getElementById('planetContent').innerHTML = contentHTML;
-    document.getElementById('planetPanel').classList.add('active');
+    document.getElementById('cardContent').innerHTML = contentHTML;
+    document.getElementById('planetInfoCard').classList.add('active');
 }
 
 // ========================================
