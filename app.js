@@ -2,8 +2,8 @@
 // Global Variables & Setup  
 // ========================================
 
-let scene, camera, renderer;
-let stars;
+let scene, camera, renderer, composer;
+let starLayers = { near: null, mid: null, far: null };
 let wormholes = [];
 let currentScene = 'loading';
 let isTransitioning = false;
@@ -65,6 +65,20 @@ function initScene() {
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Setup post-processing with bloom
+    composer = new THREE.EffectComposer(renderer);
+    const renderPass = new THREE.RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Bloom pass for glowing wormholes and particles
+    const bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        1.5,  // strength - intensity of glow
+        0.4,  // radius - how far glow spreads
+        0.85  // threshold - only bright objects glow
+    );
+    composer.addPass(bloomPass);
 
     setupEventListeners();
 }
@@ -199,10 +213,10 @@ function animateReverseWormholeTravel() {
     // Reverse barrel roll
     camera.rotation.z -= 0.02;
 
-    // Stars spin
-    if (stars) {
-        stars.rotation.y += 0.01;
-    }
+    // Parallax stars spin at different speeds
+    if (starLayers.near) starLayers.near.rotation.y += 0.001;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.0005;
+    if (starLayers.far) starLayers.far.rotation.y += 0.0002;
 }
 
 function exitToOpenSpace(wormholeConfig) {
@@ -376,6 +390,31 @@ function simulateLoading() {
                 currentStage++;
             }
 
+            // Randomly show system messages (errors, warnings, successes)
+            if (Math.random() > 0.92) {
+                const systemMessages = [
+                    { type: 'error', text: '[ERROR] Wormhole instability detected - stabilizing...' },
+                    { type: 'warning', text: '[WARNING] Anomaly detected in sector 7' },
+                    { type: 'success', text: '[OK] Quantum entanglement stable' },
+                    { type: 'error', text: '[FAIL] Timeline convergence error - retrying...' },
+                    { type: 'warning', text: '[WARNING] Dark matter fluctuation: 12.4%' },
+                    { type: 'success', text: '[OK] Gravitational waves normalized' },
+                    { type: 'error', text: '[EXCEPTION] Paradox detected - resolving...' },
+                    { type: 'warning', text: '[WARNING] Temporal drift: +0.003s' },
+                    { type: 'success', text: '[OK] Spacetime fabric integrity: 99.7%' },
+                    { type: 'error', text: '[ERROR] Reality.matrix overflow - handled' },
+                    { type: 'warning', text: '[WARNING] Unknown signal from deep space' },
+                    { type: 'success', text: '[OK] Dimensional barriers stable' }
+                ];
+
+                const msg = systemMessages[Math.floor(Math.random() * systemMessages.length)];
+                const msgLine = document.createElement('div');
+                msgLine.className = `terminal-line ${msg.type}`;
+                msgLine.textContent = msg.text;
+                terminalOutput.appendChild(msgLine);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            }
+
             // Pick random equation
             const equation = PHYSICS_EQUATIONS[Math.floor(Math.random() * PHYSICS_EQUATIONS.length)];
 
@@ -425,26 +464,67 @@ function simulateLoading() {
 // ========================================
 
 function createStarfield() {
-    const starsGeometry = new THREE.BufferGeometry();
-    const starsMaterial = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 0.2,
-        transparent: true,
-        opacity: 0.8
-    });
+    // Create three layers of stars for parallax depth effect
 
-    const starsVertices = [];
-    for (let i = 0; i < 5000; i++) {
+    // Near layer - large, blue-tinted, fast-moving
+    const nearGeometry = new THREE.BufferGeometry();
+    const nearVertices = [];
+    for (let i = 0; i < 1000; i++) {
         const x = (Math.random() - 0.5) * 400;
         const y = (Math.random() - 0.5) * 400;
-        const z = (Math.random() - 0.5) * 400;
-        starsVertices.push(x, y, z);
+        const z = (Math.random() - 0.5) * 200;
+        nearVertices.push(x, y, z);
     }
+    nearGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nearVertices, 3));
+    const nearMaterial = new THREE.PointsMaterial({
+        color: 0xadd8ff, // Slight blue tint
+        size: 0.4,
+        transparent: true,
+        opacity: 0.9
+    });
+    starLayers.near = new THREE.Points(nearGeometry, nearMaterial);
+    starLayers.near.name = 'starfield-near';
+    scene.add(starLayers.near);
 
-    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
-    stars = new THREE.Points(starsGeometry, starsMaterial);
-    stars.name = 'starfield';
-    scene.add(stars);
+    // Mid layer - medium, white, moderate speed
+    const midGeometry = new THREE.BufferGeometry();
+    const midVertices = [];
+    for (let i = 0; i < 2000; i++) {
+        const x = (Math.random() - 0.5) * 600;
+        const y = (Math.random() - 0.5) * 600;
+        const z = (Math.random() - 0.5) * 400;
+        midVertices.push(x, y, z);
+    }
+    midGeometry.setAttribute('position', new THREE.Float32BufferAttribute(midVertices, 3));
+    const midMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.25,
+        transparent: true,
+        opacity: 0.85
+    });
+    starLayers.mid = new THREE.Points(midGeometry, midMaterial);
+    starLayers.mid.name = 'starfield-mid';
+    scene.add(starLayers.mid);
+
+    // Far layer - small, red-tinted, slow-moving
+    const farGeometry = new THREE.BufferGeometry();
+    const farVertices = [];
+    for (let i = 0; i < 2000; i++) {
+        const x = (Math.random() - 0.5) * 800;
+        const y = (Math.random() - 0.5) * 800;
+        const z = (Math.random() - 0.5) * 600;
+        farVertices.push(x, y, z);
+    }
+    farGeometry.setAttribute('position', new THREE.Float32BufferAttribute(farVertices, 3));
+    const farMaterial = new THREE.PointsMaterial({
+        color: 0xffd4aa, // Slight red tint
+        size: 0.15,
+        transparent: true,
+        opacity: 0.7
+    });
+    starLayers.far = new THREE.Points(farGeometry, farMaterial);
+    starLayers.far.name = 'starfield-far';
+    scene.add(starLayers.far);
 }
 
 function createWormholes() {
@@ -474,44 +554,37 @@ function createWormholes() {
 function createSpacetimeGrid(color) {
     const gridGroup = new THREE.Group();
 
-    // Create two grid planes (top and bottom) - much more subtle
-    const gridSize = 60;      // Reduced from 80 for less dominance
-    const segments = 20;      // Reduced from 30 for sparser grid
+    // Create circular concentric rings that fade out radially
+    const numRings = 25;
+    const maxRadius = 50;
 
-    for (let side = 0; side < 2; side++) {
-        const gridGeometry = new THREE.PlaneGeometry(gridSize, gridSize, segments, segments);
-        const positions = gridGeometry.attributes.position;
+    for (let i = 0; i < numRings; i++) {
+        const radius = (i / numRings) * maxRadius;
+        const ringGeometry = new THREE.RingGeometry(radius, radius + 0.3, 64);
 
-        // Warp the grid to show gravitational curvature
-        for (let i = 0; i < positions.count; i++) {
-            const x = positions.getX(i);
-            const y = positions.getY(i);
-            const dist = Math.sqrt(x * x + y * y);
+        // Calculate opacity - stronger at center, fades to edges
+        const normalizedDistance = i / numRings;
+        const opacity = 0.15 * Math.pow(1 - normalizedDistance, 2); // Quadratic fade
 
-            // Create funnel curve - stronger near center
-            const warpStrength = 15;
-            const warp = warpStrength / (1 + dist * 0.08);
-
-            // Apply warp (negative for top, positive for bottom)
-            const zOffset = side === 0 ? -warp : warp;
-            positions.setZ(i, zOffset);
-        }
-
-        positions.needsUpdate = true;
-
-        // Wireframe material - MUCH more transparent
-        const gridMaterial = new THREE.MeshBasicMaterial({
+        const ringMaterial = new THREE.MeshBasicMaterial({
             color: color,
-            wireframe: true,
             transparent: true,
-            opacity: 0.04,         // Dramatically reduced from 0.15 to 0.04
+            opacity: Math.max(0.01, opacity), // Minimum 0.01 for visibility
+            side: THREE.DoubleSide,
             blending: THREE.AdditiveBlending
         });
 
-        const grid = new THREE.Mesh(gridGeometry, gridMaterial);
-        grid.rotation.x = side === 0 ? 0 : Math.PI;
-        grid.name = `grid_${side}`;
-        gridGroup.add(grid);
+        // Create top ring
+        const topRing = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+        topRing.rotation.x = Math.PI / 2;
+        topRing.position.y = 5; // Slightly above center
+        gridGroup.add(topRing);
+
+        // Create bottom ring
+        const bottomRing = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+        bottomRing.rotation.x = -Math.PI / 2;
+        bottomRing.position.y = -5; // Slightly below center
+        gridGroup.add(bottomRing);
     }
 
     gridGroup.name = 'spacetimeGrid';
@@ -707,6 +780,35 @@ function createAccretionParticles(color) {
     return particlesGroup;
 }
 
+function createLensFlare(color) {
+    // Create 8-pointed star-burst lens flare
+    const flareGroup = new THREE.Group();
+    const numSpikes = 8;
+
+    for (let i = 0; i < numSpikes; i++) {
+        const angle = (i / numSpikes) * Math.PI * 2;
+
+        // Create elongated rectangular plane for each spike
+        const spikeGeometry = new THREE.PlaneGeometry(0.5, 25);
+        const spikeMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+        spike.rotation.z = angle;
+        flareGroup.add(spike);
+    }
+
+    flareGroup.name = 'lensFlare';
+    return flareGroup;
+}
+
+
 function createWormholeGroup(color, label) {
     const group = new THREE.Group();
 
@@ -734,10 +836,15 @@ function createWormholeGroup(color, label) {
     const particles = createAccretionParticles(color);
     group.add(particles);
 
-    // 7. Label
+    // 7. Lens flare (cinematic star-burst effect)
+    const lensFlare = createLensFlare(color);
+    group.add(lensFlare);
+
+    // 8. Label
     const labelSprite = createTextLabel(label, color);
     labelSprite.position.y = 18;
     group.add(labelSprite);
+
 
     return group;
 }
@@ -837,7 +944,7 @@ function animate() {
         }
     }
 
-    renderer.render(scene, camera);
+    composer.render();
 }
 
 function updateFlightControls() {
@@ -989,12 +1096,50 @@ function animateWormholes() {
         if (throat) {
             throat.rotation.z += 0.003;
         }
+
+        // Animate lens flare - dynamic based on viewing angle
+        const lensFlare = wormhole.group.getObjectByName('lensFlare');
+        if (lensFlare) {
+            // Slow rotation for dynamic effect
+            lensFlare.rotation.z += 0.002;
+
+            // Calculate angle between camera and wormhole
+            const wormholeWorldPos = new THREE.Vector3();
+            wormhole.group.getWorldPosition(wormholeWorldPos);
+
+            const directionToWormhole = new THREE.Vector3();
+            directionToWormhole.subVectors(wormholeWorldPos, camera.position).normalize();
+
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+
+            // Dot product gives us angle alignment (-1 to 1)
+            const alignment = cameraDirection.dot(directionToWormhole);
+
+            // Distance-based scaling
+            const distance = camera.position.distanceTo(wormholeWorldPos);
+            const distanceFactor = Math.max(0, 1 - distance / 150);
+
+            // Adjust opacity based on viewing angle and distance
+            // Brightest when looking directly at it
+            const targetOpacity = Math.max(0, alignment) * 0.3 * distanceFactor;
+
+            lensFlare.children.forEach(spike => {
+                if (spike.material) {
+                    spike.material.opacity = targetOpacity;
+                }
+            });
+
+            // Scale with distance (larger when closer)
+            const scale = 1 + distanceFactor * 0.5;
+            lensFlare.scale.set(scale, scale, scale);
+        }
     });
 
-    // Rotate starfield
-    if (stars) {
-        stars.rotation.y += 0.0003;
-    }
+    // Parallax starfield rotation
+    if (starLayers.near) starLayers.near.rotation.y += 0.0005;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.0003;
+    if (starLayers.far) starLayers.far.rotation.y += 0.0001;
 }
 
 function animateWormholeTravel() {
@@ -1029,10 +1174,10 @@ function animateWormholeTravel() {
     // Barrel roll effect
     camera.rotation.z += 0.02;
 
-    // Stars spin for wormhole effect
-    if (stars) {
-        stars.rotation.y += 0.01;
-    }
+    // Parallax stars spin for wormhole effect
+    if (starLayers.near) starLayers.near.rotation.y += 0.01;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.008;
+    if (starLayers.far) starLayers.far.rotation.y += 0.005;
 }
 
 // ========================================
@@ -1123,6 +1268,7 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function onMouseMove(event) {

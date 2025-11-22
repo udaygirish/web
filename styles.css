@@ -970,3 +970,312 @@ body {
 .profile-screen::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
+/* ========================================
+   HUD Enhancements
+   ======================================== */
+
+/* HUD Scan Line Effect */
+.hud-scanline {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(to bottom, 
+        transparent,
+        rgba(0, 255, 136, 0.6),
+        transparent);
+    pointer-events: none;
+    z-index: 100;
+    animation: hudScanlineMove 4s linear infinite;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.8);
+}
+
+@keyframes hudScanlineMove {
+    0% {
+        transform: translateY(0);
+    }
+    100% {
+        transform: translateY(100vh);
+    }
+}
+
+/* HUD Corner Brackets */
+.hud-corners {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 95;
+}
+
+.corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-color: rgba(0, 255, 136, 0.5);
+    border-style: solid;
+    transition: all 0.3s ease;
+}
+
+.corner-tl {
+    top: 20px;
+    left: 20px;
+    border-width: 2px 0 0 2px;
+}
+
+.corner-tr {
+    top: 20px;
+    right: 20px;
+    border-width: 2px 2px 0 0;
+}
+
+.corner-bl {
+    bottom: 20px;
+    left: 20px;
+    border-width: 0 0 2px 2px;
+}
+
+.corner-br {
+    bottom: 20px;
+    right: 20px;
+    border-width: 0 2px 2px 0;
+}
+
+/* Animated brackets when target locked */
+.hud.target-locked .corner {
+    border-color: rgba(0, 255, 136, 0.9);
+    width: 60px;
+    height: 60px;
+    animation: bracketPulse 1s ease-in-out infinite;
+}
+
+@keyframes bracketPulse {
+    0%, 100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* Distance Indicator with Target Lock Effect */
+.hud-distance {
+    font-family: 'Orbitron', sans-serif !important;
+    letter-spacing: 1px;
+}
+
+.hud-distance.hud-target-lock {
+    color: #00ff88;
+    animation: targetLockPulse 0.5s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
+}
+
+@keyframes targetLockPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
+}
+
+/* Screen Flicker Effect */
+.hud::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 255, 136, 0.02);
+    pointer-events: none;
+    z-index: 90;
+    animation: hudFlicker 3s infinite;
+}
+
+@keyframes hudFlicker {
+    0%, 100% {
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 1;
+    }
+    75% {
+        opacity: 0.95;
+    }
+}
+
+
+/* ========================================
+   Deep Space Warning
+   ======================================== */
+
+.deep-space-warning {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 150;
+    pointer-events: none;
+    animation: warningPulse 1s ease-in-out infinite;
+}
+
+.deep-space-warning.hidden {
+    display: none;
+}
+
+.warning-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8));
+    animation: warningShake 0.5s ease-in-out infinite;
+}
+
+.warning-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ff0000;
+    text-shadow: 
+        0 0 10px rgba(255, 0, 0, 0.8),
+        0 0 20px rgba(255, 0, 0, 0.6),
+        0 0 30px rgba(255, 0, 0, 0.4);
+    letter-spacing: 3px;
+    margin-bottom: 0.5rem;
+}
+
+.warning-subtext {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    color: #ff6666;
+    text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+    letter-spacing: 2px;
+}
+
+@keyframes warningPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+@keyframes warningShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+/* Red tint overlay when in deep space */
+.hud.deep-space-mode::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.15) 100%);
+    pointer-events: none;
+    z-index: 89;
+    animation: redPulse 2s ease-in-out infinite;
+}
+
+@keyframes redPulse {
+    0%, 100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+
+/* ========================================
+   Terminal System Messages
+   ======================================== */
+
+.terminal-line.error {
+    color: #ff3333;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(255, 51, 51, 0.8);
+    animation: errorBlink 0.3s ease-in-out;
+}
+
+.terminal-line.warning {
+    color: #ffaa00;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(255, 170, 0, 0.8);
+}
+
+.terminal-line.success {
+    color: #00ff00;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.6);
+}
+
+@keyframes errorBlink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+
+/* Terminal Content Width Improvements */
+.terminal-line.equation {
+    padding-left: 2rem;
+    font-size: 0.95rem;
+    display: block;
+    width: 100%;
+    max-width: 90%;
+}
+
+/* Every 3rd equation aligns to the right */
+.terminal-line.equation:nth-child(3n) {
+    text-align: right;
+    padding-left: 0;
+    padding-right: 2rem;
+}
+
+/* Every 5th equation centers */
+.terminal-line.equation:nth-child(5n) {
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* System messages span full width */
+.terminal-line.error,
+.terminal-line.warning,
+.terminal-line.success {
+    width: 100%;
+    display: block;
+    padding: 0.3rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 3px solid currentColor;
+}
+
+/* Command messages fill more space */
+.terminal-line.command {
+    width: 100%;
+    max-width: 95%;
+    display: block;
+}
+

@@ -7,21 +7,21 @@ const WORMHOLE_CONFIG = [
         id: 'personal',
         label: 'Personal',
         color: 0x00ff88,        // Green
-        position: { x: -30, y: 0, z: -120 },
+        position: { x: -60, y: 20, z: -180 },
         destination: './personal/index.html'
     },
     {
         id: 'work',
         label: 'Work',
         color: 0x06ffa5,        // Cyan
-        position: { x: 30, y: 0, z: -120 },
+        position: { x: 60, y: -20, z: -180 },
         destination: './work/index.html'
     },
     {
         id: 'blog',
         label: 'Blog',
         color: 0xff6b35,        // Orange (star-like)
-        position: { x: 0, y: -40, z: -120 },
+        position: { x: 0, y: -60, z: -200 },
         destination: './blog/index.html'
     }
     // Add more wormholes here! Example:
