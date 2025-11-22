@@ -23,15 +23,14 @@ const WORMHOLE_CONFIG = [
         color: 0xff6b35,        // Orange (star-like)
         position: { x: 0, y: -60, z: -200 },
         destination: './blog/index.html'
+    },
+    {
+        id: 'my_world_view',
+        label: 'My World View',
+        color: 0x4cc9f0,        // Cyan/Blue
+        position: { x: 0, y: 60, z: -220 },
+        destination: './my_world_view/index.html'
     }
-    // Add more wormholes here! Example:
-    // {
-    //     id: 'projects',
-    //     label: 'Projects',
-    //     color: 0xff6b35,     // Orange
-    //     position: { x: 0, y: 30, z: -120 },
-    //     destination: './projects/index.html'
-    // }
 ];
 
 // Export for use in app.js

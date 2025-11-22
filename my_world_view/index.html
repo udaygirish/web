@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar 3D | Portfolio Navigation</title>
+    <meta name="description" content="3D immersive solar system portfolio">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Canvas -->
+    <canvas id="canvas3d"></canvas>
+
+    <!-- HUD Overlay -->
+    <div class="hud">
+        <!-- Back Button -->
+        <button class="back-button" onclick="window.location.href='../index.html?from=my_world_view'">
+            ← Return to Navigation
+        </button>
+
+        <!-- Title -->
+        <div class="title-overlay">
+            <h1>My World View</h1>
+            <p>Explore my universe</p>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="btn3D">3D View</button>
+            <button class="toggle-btn" id="btn2D">2D Map</button>
+        </div>
+
+        <!-- Controls Hint -->
+        <div class="controls-hint">
+            <p><strong>Controls:</strong> WASD - Move | Mouse - Look | Click Planet - View Info</p>
+        </div>
+
+        <!-- Current System Info -->
+        <div class="system-info" id="systemInfo">
+            <span class="system-name" id="systemName">---</span>
+        </div>
+    </div>
+
+    <!-- Planet Info Panel -->
+    <div class="planet-panel" id="planetPanel">
+        <button class="close-btn" id="closeBtn">×</button>
+        <h2 id="planetTitle">Planet Name</h2>
+        <div id="planetContent">
+            <!-- Content will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
