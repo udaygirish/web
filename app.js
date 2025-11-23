@@ -372,10 +372,77 @@ function simulateLoading() {
 
         let currentStage = 0;
 
+        // Create a circular progress indicator in bottom right
+        const progressContainer = document.createElement('div');
+        progressContainer.style.position = 'fixed';
+        progressContainer.style.bottom = '30px';
+        progressContainer.style.right = '30px';
+        progressContainer.style.width = '80px';
+        progressContainer.style.height = '80px';
+        progressContainer.style.zIndex = '100';
+        progressContainer.style.display = 'flex';
+        progressContainer.style.alignItems = 'center';
+        progressContainer.style.justifyContent = 'center';
+
+        // SVG Circle for progress
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '80');
+        svg.setAttribute('height', '80');
+        svg.style.transform = 'rotate(-90deg)'; // Start from top
+
+        const circleBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circleBg.setAttribute('cx', '40');
+        circleBg.setAttribute('cy', '40');
+        circleBg.setAttribute('r', '36');
+        circleBg.setAttribute('stroke', '#003300');
+        circleBg.setAttribute('stroke-width', '4');
+        circleBg.setAttribute('fill', 'none');
+
+        const circleProgress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circleProgress.setAttribute('cx', '40');
+        circleProgress.setAttribute('cy', '40');
+        circleProgress.setAttribute('r', '36');
+        circleProgress.setAttribute('stroke', '#00ff00');
+        circleProgress.setAttribute('stroke-width', '4');
+        circleProgress.setAttribute('fill', 'none');
+        circleProgress.setAttribute('stroke-dasharray', '226'); // 2 * pi * 36
+        circleProgress.setAttribute('stroke-dashoffset', '226');
+        circleProgress.style.transition = 'stroke-dashoffset 0.1s linear';
+
+        svg.appendChild(circleBg);
+        svg.appendChild(circleProgress);
+
+        // Text for percentage
+        const text = document.createElement('div');
+        text.style.position = 'absolute';
+        text.style.color = '#00ff00';
+        text.style.fontFamily = "'Courier New', monospace";
+        text.style.fontWeight = 'bold';
+        text.style.fontSize = '16px';
+        text.textContent = '0%';
+
+        progressContainer.appendChild(svg);
+        progressContainer.appendChild(text);
+        terminalOutput.appendChild(progressContainer);
+
+        function updateProgress(percent) {
+            // Update circle
+            const circumference = 226;
+            const offset = circumference - (percent / 100) * circumference;
+            circleProgress.setAttribute('stroke-dashoffset', offset);
+
+            // Update text
+            text.textContent = `${percent}%`;
+        }
+
         function addRandomEquation() {
             const elapsed = Date.now() - startTime;
+            const percent = Math.min(100, Math.floor((elapsed / duration) * 100));
+
+            updateProgress(percent);
 
             if (elapsed >= duration) {
+                progressContainer.remove(); // Remove progress circle when done
                 completeLoading();
                 return;
             }
@@ -385,6 +452,7 @@ function simulateLoading() {
                 const stageLine = document.createElement('div');
                 stageLine.className = 'terminal-line command';
                 stageLine.textContent = stages[currentStage].message;
+                // Insert before progress container (though it's fixed, so order in DOM matters less for visual, but good for structure)
                 terminalOutput.appendChild(stageLine);
                 terminalOutput.scrollTop = terminalOutput.scrollHeight;
                 currentStage++;
