@@ -2,8 +2,8 @@
 // Global Variables & Setup  
 // ========================================
 
-let scene, camera, renderer;
-let stars;
+let scene, camera, renderer, composer;
+let starLayers = { near: null, mid: null, far: null };
 let wormholes = [];
 let currentScene = 'loading';
 let isTransitioning = false;
@@ -65,6 +65,20 @@ function initScene() {
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Setup post-processing with bloom
+    composer = new THREE.EffectComposer(renderer);
+    const renderPass = new THREE.RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Bloom pass for glowing wormholes and particles
+    const bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        1.5,  // strength - intensity of glow
+        0.4,  // radius - how far glow spreads
+        0.85  // threshold - only bright objects glow
+    );
+    composer.addPass(bloomPass);
 
     setupEventListeners();
 }
@@ -199,10 +213,10 @@ function animateReverseWormholeTravel() {
     // Reverse barrel roll
     camera.rotation.z -= 0.02;
 
-    // Stars spin
-    if (stars) {
-        stars.rotation.y += 0.01;
-    }
+    // Parallax stars spin at different speeds
+    if (starLayers.near) starLayers.near.rotation.y += 0.001;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.0005;
+    if (starLayers.far) starLayers.far.rotation.y += 0.0002;
 }
 
 function exitToOpenSpace(wormholeConfig) {
@@ -358,10 +372,77 @@ function simulateLoading() {
 
         let currentStage = 0;
 
+        // Create a circular progress indicator in bottom right
+        const progressContainer = document.createElement('div');
+        progressContainer.style.position = 'fixed';
+        progressContainer.style.bottom = '30px';
+        progressContainer.style.right = '30px';
+        progressContainer.style.width = '80px';
+        progressContainer.style.height = '80px';
+        progressContainer.style.zIndex = '100';
+        progressContainer.style.display = 'flex';
+        progressContainer.style.alignItems = 'center';
+        progressContainer.style.justifyContent = 'center';
+
+        // SVG Circle for progress
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '80');
+        svg.setAttribute('height', '80');
+        svg.style.transform = 'rotate(-90deg)'; // Start from top
+
+        const circleBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circleBg.setAttribute('cx', '40');
+        circleBg.setAttribute('cy', '40');
+        circleBg.setAttribute('r', '36');
+        circleBg.setAttribute('stroke', '#003300');
+        circleBg.setAttribute('stroke-width', '4');
+        circleBg.setAttribute('fill', 'none');
+
+        const circleProgress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circleProgress.setAttribute('cx', '40');
+        circleProgress.setAttribute('cy', '40');
+        circleProgress.setAttribute('r', '36');
+        circleProgress.setAttribute('stroke', '#00ff00');
+        circleProgress.setAttribute('stroke-width', '4');
+        circleProgress.setAttribute('fill', 'none');
+        circleProgress.setAttribute('stroke-dasharray', '226'); // 2 * pi * 36
+        circleProgress.setAttribute('stroke-dashoffset', '226');
+        circleProgress.style.transition = 'stroke-dashoffset 0.1s linear';
+
+        svg.appendChild(circleBg);
+        svg.appendChild(circleProgress);
+
+        // Text for percentage
+        const text = document.createElement('div');
+        text.style.position = 'absolute';
+        text.style.color = '#00ff00';
+        text.style.fontFamily = "'Courier New', monospace";
+        text.style.fontWeight = 'bold';
+        text.style.fontSize = '16px';
+        text.textContent = '0%';
+
+        progressContainer.appendChild(svg);
+        progressContainer.appendChild(text);
+        terminalOutput.appendChild(progressContainer);
+
+        function updateProgress(percent) {
+            // Update circle
+            const circumference = 226;
+            const offset = circumference - (percent / 100) * circumference;
+            circleProgress.setAttribute('stroke-dashoffset', offset);
+
+            // Update text
+            text.textContent = `${percent}%`;
+        }
+
         function addRandomEquation() {
             const elapsed = Date.now() - startTime;
+            const percent = Math.min(100, Math.floor((elapsed / duration) * 100));
+
+            updateProgress(percent);
 
             if (elapsed >= duration) {
+                progressContainer.remove(); // Remove progress circle when done
                 completeLoading();
                 return;
             }
@@ -371,9 +452,35 @@ function simulateLoading() {
                 const stageLine = document.createElement('div');
                 stageLine.className = 'terminal-line command';
                 stageLine.textContent = stages[currentStage].message;
+                // Insert before progress container (though it's fixed, so order in DOM matters less for visual, but good for structure)
                 terminalOutput.appendChild(stageLine);
                 terminalOutput.scrollTop = terminalOutput.scrollHeight;
                 currentStage++;
+            }
+
+            // Randomly show system messages (errors, warnings, successes)
+            if (Math.random() > 0.92) {
+                const systemMessages = [
+                    { type: 'error', text: '[ERROR] Wormhole instability detected - stabilizing...' },
+                    { type: 'warning', text: '[WARNING] Anomaly detected in sector 7' },
+                    { type: 'success', text: '[OK] Quantum entanglement stable' },
+                    { type: 'error', text: '[FAIL] Timeline convergence error - retrying...' },
+                    { type: 'warning', text: '[WARNING] Dark matter fluctuation: 12.4%' },
+                    { type: 'success', text: '[OK] Gravitational waves normalized' },
+                    { type: 'error', text: '[EXCEPTION] Paradox detected - resolving...' },
+                    { type: 'warning', text: '[WARNING] Temporal drift: +0.003s' },
+                    { type: 'success', text: '[OK] Spacetime fabric integrity: 99.7%' },
+                    { type: 'error', text: '[ERROR] Reality.matrix overflow - handled' },
+                    { type: 'warning', text: '[WARNING] Unknown signal from deep space' },
+                    { type: 'success', text: '[OK] Dimensional barriers stable' }
+                ];
+
+                const msg = systemMessages[Math.floor(Math.random() * systemMessages.length)];
+                const msgLine = document.createElement('div');
+                msgLine.className = `terminal-line ${msg.type}`;
+                msgLine.textContent = msg.text;
+                terminalOutput.appendChild(msgLine);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
             }
 
             // Pick random equation
@@ -425,26 +532,67 @@ function simulateLoading() {
 // ========================================
 
 function createStarfield() {
-    const starsGeometry = new THREE.BufferGeometry();
-    const starsMaterial = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 0.2,
-        transparent: true,
-        opacity: 0.8
-    });
+    // Create three layers of stars for parallax depth effect
 
-    const starsVertices = [];
-    for (let i = 0; i < 5000; i++) {
+    // Near layer - large, blue-tinted, fast-moving
+    const nearGeometry = new THREE.BufferGeometry();
+    const nearVertices = [];
+    for (let i = 0; i < 1000; i++) {
         const x = (Math.random() - 0.5) * 400;
         const y = (Math.random() - 0.5) * 400;
-        const z = (Math.random() - 0.5) * 400;
-        starsVertices.push(x, y, z);
+        const z = (Math.random() - 0.5) * 200;
+        nearVertices.push(x, y, z);
     }
+    nearGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nearVertices, 3));
+    const nearMaterial = new THREE.PointsMaterial({
+        color: 0xadd8ff, // Slight blue tint
+        size: 0.4,
+        transparent: true,
+        opacity: 0.9
+    });
+    starLayers.near = new THREE.Points(nearGeometry, nearMaterial);
+    starLayers.near.name = 'starfield-near';
+    scene.add(starLayers.near);
 
-    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
-    stars = new THREE.Points(starsGeometry, starsMaterial);
-    stars.name = 'starfield';
-    scene.add(stars);
+    // Mid layer - medium, white, moderate speed
+    const midGeometry = new THREE.BufferGeometry();
+    const midVertices = [];
+    for (let i = 0; i < 2000; i++) {
+        const x = (Math.random() - 0.5) * 600;
+        const y = (Math.random() - 0.5) * 600;
+        const z = (Math.random() - 0.5) * 400;
+        midVertices.push(x, y, z);
+    }
+    midGeometry.setAttribute('position', new THREE.Float32BufferAttribute(midVertices, 3));
+    const midMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.25,
+        transparent: true,
+        opacity: 0.85
+    });
+    starLayers.mid = new THREE.Points(midGeometry, midMaterial);
+    starLayers.mid.name = 'starfield-mid';
+    scene.add(starLayers.mid);
+
+    // Far layer - small, red-tinted, slow-moving
+    const farGeometry = new THREE.BufferGeometry();
+    const farVertices = [];
+    for (let i = 0; i < 2000; i++) {
+        const x = (Math.random() - 0.5) * 800;
+        const y = (Math.random() - 0.5) * 800;
+        const z = (Math.random() - 0.5) * 600;
+        farVertices.push(x, y, z);
+    }
+    farGeometry.setAttribute('position', new THREE.Float32BufferAttribute(farVertices, 3));
+    const farMaterial = new THREE.PointsMaterial({
+        color: 0xffd4aa, // Slight red tint
+        size: 0.15,
+        transparent: true,
+        opacity: 0.7
+    });
+    starLayers.far = new THREE.Points(farGeometry, farMaterial);
+    starLayers.far.name = 'starfield-far';
+    scene.add(starLayers.far);
 }
 
 function createWormholes() {
@@ -467,47 +615,304 @@ function createWormholes() {
     });
 }
 
+// ========================================
+// Helper Functions for Enhanced Wormhole
+// ========================================
+
+function createSpacetimeGrid(color) {
+    const gridGroup = new THREE.Group();
+
+    // Create circular concentric rings that fade out radially
+    const numRings = 25;
+    const maxRadius = 50;
+
+    for (let i = 0; i < numRings; i++) {
+        const radius = (i / numRings) * maxRadius;
+        const ringGeometry = new THREE.RingGeometry(radius, radius + 0.3, 64);
+
+        // Calculate opacity - stronger at center, fades to edges
+        const normalizedDistance = i / numRings;
+        const opacity = 0.15 * Math.pow(1 - normalizedDistance, 2); // Quadratic fade
+
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: Math.max(0.01, opacity), // Minimum 0.01 for visibility
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+
+        // Create top ring
+        const topRing = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+        topRing.rotation.x = Math.PI / 2;
+        topRing.position.y = 5; // Slightly above center
+        gridGroup.add(topRing);
+
+        // Create bottom ring
+        const bottomRing = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+        bottomRing.rotation.x = -Math.PI / 2;
+        bottomRing.position.y = -5; // Slightly below center
+        gridGroup.add(bottomRing);
+    }
+
+    gridGroup.name = 'spacetimeGrid';
+    return gridGroup;
+}
+
+function createEnergyRings(color) {
+    const ringsGroup = new THREE.Group();
+    const numRings = 5;
+
+    for (let i = 0; i < numRings; i++) {
+        const radius = 6 + i * 2.5;
+        const thickness = 0.3 - i * 0.03;
+        const opacity = 0.9 - i * 0.15;
+
+        const ringGeometry = new THREE.TorusGeometry(radius, thickness, 16, 100);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: opacity,
+            blending: THREE.AdditiveBlending
+        });
+
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.name = `energyRing_${i}`;
+        ring.userData.rotationSpeed = 0.01 - i * 0.002; // Slower for outer rings
+        ringsGroup.add(ring);
+    }
+
+    ringsGroup.name = 'energyRings';
+    return ringsGroup;
+}
+
+function createWormholeThroat(color) {
+    // Create hourglass/funnel shape using LatheGeometry
+    const points = [];
+    const segments = 25;
+
+    for (let i = 0; i < segments; i++) {
+        const t = i / (segments - 1);
+        const angle = t * Math.PI;
+
+        // Hourglass curve: wide at ends, narrow in middle
+        const radius = 4 + Math.sin(angle) * 6;
+        const y = (t - 0.5) * 35;
+
+        points.push(new THREE.Vector2(radius, y));
+    }
+
+    const throatGeometry = new THREE.LatheGeometry(points, 32);
+    const throatMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+    });
+
+    const throat = new THREE.Mesh(throatGeometry, throatMaterial);
+    throat.rotation.x = Math.PI / 2;
+    throat.name = 'throat';
+
+    return throat;
+}
+
+function createEventHorizon() {
+    // Black sphere at center
+    const horizonGeometry = new THREE.SphereGeometry(3.5, 32, 32);
+    const horizonMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.98
+    });
+
+    const horizon = new THREE.Mesh(horizonGeometry, horizonMaterial);
+    horizon.name = 'eventHorizon';
+
+    return horizon;
+}
+
+function createLightRays(color) {
+    const raysGroup = new THREE.Group();
+    const numRays = 16;
+
+    for (let i = 0; i < numRays; i++) {
+        const angle = (i / numRays) * Math.PI * 2;
+
+        // Create cone for light ray
+        const rayGeometry = new THREE.ConeGeometry(0.3, 25, 4);
+        const rayMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.08,
+            blending: THREE.AdditiveBlending
+        });
+
+        const ray = new THREE.Mesh(rayGeometry, rayMaterial);
+        ray.rotation.x = Math.PI / 2;
+        ray.rotation.z = angle;
+        ray.position.x = Math.cos(angle) * 10;
+        ray.position.y = Math.sin(angle) * 10;
+        ray.name = `lightRay_${i}`;
+
+        raysGroup.add(ray);
+    }
+
+    raysGroup.name = 'lightRays';
+    return raysGroup;
+}
+
+function createAccretionParticles(color) {
+    const particlesGroup = new THREE.Group();
+    const numParticles = 500; // Increased for denser field
+
+    const positions = new Float32Array(numParticles * 3);
+    const sizes = new Float32Array(numParticles);
+    const opacities = new Float32Array(numParticles);
+
+    for (let i = 0; i < numParticles; i++) {
+        // Distribute particles in a circular disk around the wormhole
+        const angle = Math.random() * Math.PI * 2;
+
+        // Use square root for more uniform circular distribution
+        const maxRadius = 35;
+        const radius = Math.sqrt(Math.random()) * maxRadius;
+
+        // Height varies less at outer edges for disk shape
+        const heightFactor = 1 - (radius / maxRadius) * 0.5;
+        const height = (Math.random() - 0.5) * 10 * heightFactor;
+
+        positions[i * 3] = Math.cos(angle) * radius;
+        positions[i * 3 + 1] = Math.sin(angle) * radius;
+        positions[i * 3 + 2] = height;
+
+        // Size decreases toward edges
+        const distanceFromCenter = radius / maxRadius;
+        sizes[i] = (1 - distanceFromCenter * 0.5) * (Math.random() * 1.5 + 0.5);
+
+        // Opacity fades out smoothly from center to edge (circular fade)
+        // Using exponential falloff for more natural appearance
+        const falloff = Math.pow(1 - distanceFromCenter, 2);
+        opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    particleGeometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
+
+    // Custom shader material for per-particle opacity
+    const particleMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            color: { value: new THREE.Color(color) },
+            pointTexture: { value: null }
+        },
+        vertexShader: `
+            attribute float size;
+            attribute float opacity;
+            varying float vOpacity;
+            
+            void main() {
+                vOpacity = opacity;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = size * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 color;
+            varying float vOpacity;
+            
+            void main() {
+                // Circular particle shape
+                vec2 center = gl_PointCoord - vec2(0.5);
+                float dist = length(center);
+                if (dist > 0.5) discard;
+                
+                // Soft edge
+                float alpha = (1.0 - dist * 2.0) * vOpacity;
+                gl_FragColor = vec4(color, alpha);
+            }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.name = 'accretionParticles';
+    particlesGroup.add(particles);
+
+    particlesGroup.name = 'particles';
+    return particlesGroup;
+}
+
+function createLensFlare(color) {
+    // Create 8-pointed star-burst lens flare
+    const flareGroup = new THREE.Group();
+    const numSpikes = 8;
+
+    for (let i = 0; i < numSpikes; i++) {
+        const angle = (i / numSpikes) * Math.PI * 2;
+
+        // Create elongated rectangular plane for each spike
+        const spikeGeometry = new THREE.PlaneGeometry(0.5, 25);
+        const spikeMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+        spike.rotation.z = angle;
+        flareGroup.add(spike);
+    }
+
+    flareGroup.name = 'lensFlare';
+    return flareGroup;
+}
+
+
 function createWormholeGroup(color, label) {
     const group = new THREE.Group();
 
-    // Main ring
-    const ringGeo = new THREE.TorusGeometry(8, 0.8, 16, 100);
-    const ringMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.7
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.name = 'ring';
-    group.add(ring);
+    // 1. Spacetime grid showing gravitational warping
+    const grid = createSpacetimeGrid(color);
+    group.add(grid);
 
-    // Glow
-    const glowGeo = new THREE.TorusGeometry(8, 1.5, 16, 100);
-    const glowMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.25,
-        blending: THREE.AdditiveBlending
-    });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.name = 'glow';
-    group.add(glow);
+    // 2. Concentric energy rings
+    const rings = createEnergyRings(color);
+    group.add(rings);
 
-    // Center
-    const centerGeo = new THREE.CircleGeometry(7.5, 64);
-    const centerMat = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 0.95
-    });
-    const center = new THREE.Mesh(centerGeo, centerMat);
-    center.name = 'center';
-    group.add(center);
+    // 3. Funnel/throat geometry
+    const throat = createWormholeThroat(color);
+    group.add(throat);
 
-    // Label
+    // 4. Event horizon (black hole center)
+    const eventHorizon = createEventHorizon();
+    group.add(eventHorizon);
+
+    // 5. Light rays emanating from center
+    const lightRays = createLightRays(color);
+    group.add(lightRays);
+
+    // 6. Accretion disk particles
+    const particles = createAccretionParticles(color);
+    group.add(particles);
+
+    // 7. Lens flare (cinematic star-burst effect)
+    const lensFlare = createLensFlare(color);
+    group.add(lensFlare);
+
+    // 8. Label
     const labelSprite = createTextLabel(label, color);
-    labelSprite.position.y = 12;
+    labelSprite.position.y = 18;
     group.add(labelSprite);
+
 
     return group;
 }
@@ -607,7 +1012,7 @@ function animate() {
         }
     }
 
-    renderer.render(scene, camera);
+    composer.render();
 }
 
 function updateFlightControls() {
@@ -656,16 +1061,153 @@ function checkWormholeProximity() {
 }
 
 function animateWormholes() {
-    wormholes.forEach((wormhole, index) => {
-        wormhole.group.rotation.z += 0.005;
+    const time = Date.now() * 0.001;
 
-        const scale = 1 + Math.sin(Date.now() * 0.001 + index * Math.PI) * 0.05;
-        wormhole.group.scale.set(scale, scale, scale);
+    wormholes.forEach((wormhole, wormholeIndex) => {
+        // Overall gentle rotation
+        wormhole.group.rotation.z += 0.002;
+
+        // Gentle breathing scale
+        const baseScale = 1 + Math.sin(time * 0.5 + wormholeIndex * Math.PI) * 0.03;
+        wormhole.group.scale.set(baseScale, baseScale, baseScale);
+
+        // Animate energy rings - rotate at different speeds
+        const energyRings = wormhole.group.getObjectByName('energyRings');
+        if (energyRings) {
+            energyRings.children.forEach((ring, ringIndex) => {
+                // Each ring rotates at its own speed (stored in userData)
+                if (ring.userData.rotationSpeed) {
+                    ring.rotation.z += ring.userData.rotationSpeed;
+                }
+
+                // Subtle pulsing opacity
+                const pulseFactor = Math.sin(time * 2 + ringIndex * 0.5) * 0.1;
+                if (ring.material) {
+                    const baseOpacity = 0.9 - ringIndex * 0.15;
+                    ring.material.opacity = baseOpacity + pulseFactor;
+                }
+            });
+        }
+
+        // Animate light rays - slow rotation
+        const lightRays = wormhole.group.getObjectByName('lightRays');
+        if (lightRays) {
+            lightRays.rotation.z += 0.005;
+
+            // Pulse light ray opacity
+            lightRays.children.forEach((ray, rayIndex) => {
+                if (ray.material) {
+                    const pulse = Math.sin(time * 3 + rayIndex * 0.2) * 0.03;
+                    ray.material.opacity = 0.08 + pulse;
+                }
+            });
+        }
+
+        // Animate particles - spiral motion
+        const particlesGroup = wormhole.group.getObjectByName('particles');
+        if (particlesGroup) {
+            const particles = particlesGroup.getObjectByName('accretionParticles');
+            if (particles && particles.geometry) {
+                const positions = particles.geometry.attributes.position.array;
+                const opacities = particles.geometry.attributes.opacity ? particles.geometry.attributes.opacity.array : null;
+                const maxRadius = 35;
+
+                for (let i = 0; i < positions.length / 3; i++) {
+                    const i3 = i * 3;
+                    const x = positions[i3];
+                    const y = positions[i3 + 1];
+
+                    // Calculate current angle and radius
+                    let angle = Math.atan2(y, x);
+                    let radius = Math.sqrt(x * x + y * y);
+
+                    // Rotate particles (spiral effect)
+                    angle += 0.01;
+
+                    // Slowly pull toward center
+                    radius -= 0.02;
+
+                    // Reset if too close to center
+                    if (radius < 8) {
+                        radius = Math.sqrt(Math.random()) * maxRadius;
+                        angle = Math.random() * Math.PI * 2;
+
+                        // Recalculate opacity for new position
+                        if (opacities) {
+                            const distanceFromCenter = radius / maxRadius;
+                            const falloff = Math.pow(1 - distanceFromCenter, 2);
+                            opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+                        }
+                    }
+
+                    // Update positions
+                    positions[i3] = Math.cos(angle) * radius;
+                    positions[i3 + 1] = Math.sin(angle) * radius;
+                }
+
+                particles.geometry.attributes.position.needsUpdate = true;
+                if (opacities) {
+                    particles.geometry.attributes.opacity.needsUpdate = true;
+                }
+            }
+        }
+
+        // Animate spacetime grid - fixed opacity to prevent blinking
+        const grid = wormhole.group.getObjectByName('spacetimeGrid');
+        if (grid) {
+            // Grid no longer pulses to prevent blinking effect
+            // Opacity remains constant at 0.04
+        }
+
+        // Animate throat - gentle rotation
+        const throat = wormhole.group.getObjectByName('throat');
+        if (throat) {
+            throat.rotation.z += 0.003;
+        }
+
+        // Animate lens flare - dynamic based on viewing angle
+        const lensFlare = wormhole.group.getObjectByName('lensFlare');
+        if (lensFlare) {
+            // Slow rotation for dynamic effect
+            lensFlare.rotation.z += 0.002;
+
+            // Calculate angle between camera and wormhole
+            const wormholeWorldPos = new THREE.Vector3();
+            wormhole.group.getWorldPosition(wormholeWorldPos);
+
+            const directionToWormhole = new THREE.Vector3();
+            directionToWormhole.subVectors(wormholeWorldPos, camera.position).normalize();
+
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+
+            // Dot product gives us angle alignment (-1 to 1)
+            const alignment = cameraDirection.dot(directionToWormhole);
+
+            // Distance-based scaling
+            const distance = camera.position.distanceTo(wormholeWorldPos);
+            const distanceFactor = Math.max(0, 1 - distance / 150);
+
+            // Adjust opacity based on viewing angle and distance
+            // Brightest when looking directly at it
+            const targetOpacity = Math.max(0, alignment) * 0.3 * distanceFactor;
+
+            lensFlare.children.forEach(spike => {
+                if (spike.material) {
+                    spike.material.opacity = targetOpacity;
+                }
+            });
+
+            // Scale with distance (larger when closer)
+            const scale = 1 + distanceFactor * 0.5;
+            lensFlare.scale.set(scale, scale, scale);
+        }
     });
 
-    if (stars) {
-        stars.rotation.y += 0.0003;
-    }
+    // Parallax starfield rotation
+    if (starLayers.near) starLayers.near.rotation.y += 0.0005;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.0003;
+    if (starLayers.far) starLayers.far.rotation.y += 0.0001;
 }
 
 function animateWormholeTravel() {
@@ -700,10 +1242,10 @@ function animateWormholeTravel() {
     // Barrel roll effect
     camera.rotation.z += 0.02;
 
-    // Stars spin for wormhole effect
-    if (stars) {
-        stars.rotation.y += 0.01;
-    }
+    // Parallax stars spin for wormhole effect
+    if (starLayers.near) starLayers.near.rotation.y += 0.01;
+    if (starLayers.mid) starLayers.mid.rotation.y += 0.008;
+    if (starLayers.far) starLayers.far.rotation.y += 0.005;
 }
 
 // ========================================
@@ -794,6 +1336,7 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function onMouseMove(event) {

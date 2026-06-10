@@ -38,11 +38,51 @@ function updateHUD() {
 
         if (nearest) {
             const distLY = (minDist * lyScale).toFixed(3);
-            document.getElementById('hud-target').textContent =
-                `${nearest.type.toUpperCase()} (${distLY} LY)`;
+            document.getElementById('hud-target').textContent = nearest.type.toUpperCase();
+            document.getElementById('hud-distance').textContent = `${distLY} LY`;
+
+            // Add target lock effect when close
+            const hudDistance = document.getElementById('hud-distance');
+            if (minDist < 30) {
+                hudDistance.classList.add('hud-target-lock');
+            } else {
+                hudDistance.classList.remove('hud-target-lock');
+            }
+
+            // Warning for My World View
+            const hudTarget = document.getElementById('hud-target');
+            if (nearest.id === 'my_world_view') {
+                hudTarget.textContent += ' [⚠️ CONSTRUCTION ZONE]';
+                hudTarget.style.color = '#ff9e3d';
+                hudTarget.classList.add('warning-pulse');
+            } else {
+                hudTarget.style.color = ''; // Reset color
+                hudTarget.classList.remove('warning-pulse');
+            }
+        }
+
+        // Check if in deep space - only sides, up/down, or way behind wormholes
+        const deepSpaceWarning = document.getElementById('deep-space-warning');
+        const hud = document.getElementById('hud');
+
+        // Trigger warning if:
+        // - Too far left/right (|x| > 150)
+        // - Too far up/down (|y| > 120)  
+        // - Way past wormholes into deep space behind (z < -300)
+        const tooFarSides = Math.abs(camera.position.x) > 150;
+        const tooFarVertical = Math.abs(camera.position.y) > 120;
+        const tooFarBehind = camera.position.z < -300;
+
+        if (tooFarSides || tooFarVertical || tooFarBehind) {
+            deepSpaceWarning.classList.remove('hidden');
+            hud.classList.add('deep-space-mode');
+        } else {
+            deepSpaceWarning.classList.add('hidden');
+            hud.classList.remove('deep-space-mode');
         }
     } else {
         document.getElementById('hud-target').textContent = '---';
+        document.getElementById('hud-distance').textContent = '---';
     }
 }
 

@@ -1,0 +1,448 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: #000000;
+    color: #ffffff;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Canvas */
+#canvas3d {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* HUD */
+.hud {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Back Button */
+.back-button {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    padding: 12px 24px;
+    background: rgba(76, 201, 240, 0.2);
+    border: 2px solid #4cc9f0;
+    border-radius: 50px;
+    color: #4cc9f0;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    pointer-events: auto;
+}
+
+.back-button:hover {
+    background: rgba(76, 201, 240, 0.4);
+    transform: translateX(-5px);
+    box-shadow: 0 0 20px rgba(76, 201, 240, 0.6);
+}
+
+/* Title Overlay */
+.title-overlay {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    text-align: right;
+}
+
+.title-overlay h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #4cc9f0, #9d4edd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 40px rgba(76, 201, 240, 0.5);
+    margin-bottom: 8px;
+}
+
+.title-overlay p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 300;
+}
+
+/* Controls Hint */
+.controls-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    padding: 12px 24px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(76, 201, 240, 0.3);
+    border-radius: 50px;
+    backdrop-filter: blur(10px);
+}
+
+.controls-hint p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+}
+
+.controls-hint strong {
+    color: #4cc9f0;
+}
+
+/* System Info */
+.system-info {
+    position: fixed;
+    top: 100px;
+    left: 20px;
+    z-index: 100;
+    padding: 16px 24px;
+    background: rgba(0, 0, 0, 0.6);
+    border-left: 4px solid #4cc9f0;
+    border-radius: 4px;
+    backdrop-filter: blur(10px);
+}
+
+.system-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #4cc9f0;
+    text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+}
+
+/* Planet Info Panel */
+.planet-panel {
+    position: fixed;
+    right: -500px;
+    top: 0;
+    width: 450px;
+    height: 100vh;
+    background: rgba(10, 10, 15, 0.95);
+    backdrop-filter: blur(20px);
+    border-left: 2px solid rgba(76, 201, 240, 0.5);
+    padding: 40px;
+    z-index: 200;
+    transition: right 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    overflow-y: auto;
+    box-shadow: -10px 0 50px rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
+}
+
+.planet-panel.active {
+    right: 0;
+}
+
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 300;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.planet-panel h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #4cc9f0;
+    text-shadow: 0 0 20px rgba(76, 201, 240, 0.5);
+}
+
+.planet-panel h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.3rem;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    color: #9d4edd;
+}
+
+.planet-panel p {
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 15px;
+}
+
+.planet-panel ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.planet-panel li {
+    padding: 8px 0;
+    padding-left: 20px;
+    position: relative;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.planet-panel li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: #4cc9f0;
+}
+
+/* Scrollbar */
+.planet-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.planet-panel::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.planet-panel::-webkit-scrollbar-thumb {
+    background: rgba(76, 201, 240, 0.5);
+    border-radius: 4px;
+}
+
+.planet-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(76, 201, 240, 0.8);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .planet-panel {
+        width: 100%;
+        padding: 30px 20px;
+    }
+
+    .title-overlay h1 {
+        font-size: 1.5rem;
+    }
+
+    .back-button {
+        padding: 10px 20px;
+        font-size: 12px;
+    }
+
+    .controls-hint {
+        bottom: 10px;
+        padding: 10px 16px;
+    }
+
+    .controls-hint p {
+        font-size: 11px;
+    }
+}
+/* View Toggle */
+.view-toggle {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(76, 201, 240, 0.3);
+    border-radius: 50px;
+    padding: 4px;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+}
+
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 8px 20px;
+    border-radius: 40px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-btn.active {
+    background: rgba(76, 201, 240, 0.2);
+    color: #4cc9f0;
+    box-shadow: 0 0 15px rgba(76, 201, 240, 0.3);
+}
+
+.toggle-btn:hover:not(.active) {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Construction Warning */
+.construction-warning {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 165, 0, 0.2);
+    border: 2px solid #ff9e3d;
+    color: #ff9e3d;
+    padding: 20px 40px;
+    border-radius: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    text-shadow: 0 0 10px rgba(255, 158, 61, 0.5);
+    box-shadow: 0 0 30px rgba(255, 158, 61, 0.2);
+    backdrop-filter: blur(5px);
+}
+
+.construction-warning.visible {
+    opacity: 1;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0% { box-shadow: 0 0 30px rgba(255, 158, 61, 0.2); }
+    50% { box-shadow: 0 0 50px rgba(255, 158, 61, 0.5); }
+    100% { box-shadow: 0 0 30px rgba(255, 158, 61, 0.2); }
+}
+
+/* Floating Info Card */
+.planet-info-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 300px;
+    background: rgba(10, 10, 15, 0.9);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(76, 201, 240, 0.5);
+    border-radius: 12px;
+    padding: 0;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -100%); /* Center horizontally, position above */
+    transition: opacity 0.3s ease, transform 0.1s linear;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+}
+
+.planet-info-card.active {
+    opacity: 1;
+    pointer-events: auto;
+    margin-top: -20px; /* Offset from planet */
+}
+
+.card-header {
+    background: linear-gradient(90deg, rgba(76, 201, 240, 0.2), transparent);
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(76, 201, 240, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    color: #4cc9f0;
+    margin: 0;
+    text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+}
+
+.card-body {
+    padding: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.card-body p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 15px;
+}
+
+.card-body h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    color: #9d4edd;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-body ul {
+    list-style: none;
+    padding: 0;
+}
+
+.card-body li {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 4px 0 4px 15px;
+    position: relative;
+}
+
+.card-body li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: #4cc9f0;
+}
+
+.close-card-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-card-btn:hover {
+    color: #ffffff;
+}
+
+/* Connecting Line (Optional visual flair) */
+.planet-info-card::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 10px 10px 0;
+    border-style: solid;
+    border-color: rgba(76, 201, 240, 0.5) transparent transparent transparent;
+}
