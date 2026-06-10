@@ -176,8 +176,15 @@ function createSolarSystems() {
                 {
                     name: 'webAI', orbit: 120, size: 9, color: 0xff5722, speed: 0.0005, sequence: 7, content: {
                         title: 'Senior ML Engineer',
-                        description: 'webAI (May 2025 - Present)',
+                        description: 'webAI (May 2025 - Dec 2025)',
                         details: ['Production ML pipelines', 'Scaling intelligent applications', 'Computer Vision research']
+                    }
+                },
+                {
+                    name: 'Tiger Analytics (Sr. MLE)', orbit: 135, size: 9.5, color: 0xe65100, speed: 0.0004, sequence: 8, content: {
+                        title: 'Senior Machine Learning Engineer',
+                        description: 'Tiger Analytics (Dec 2025 - Present)',
+                        details: ['Leading ML engineering & MLOps development', 'Building LLM Agents, RAGs, and Digital Twins', 'Scaling production ML solutions']
                     }
                 }
             ]
@@ -216,24 +223,45 @@ function createSolarSystems() {
             starColor: 0x9d4edd,
             planets: [
                 {
-                    name: 'Procedural', orbit: 40, size: 8, color: 0x9d4edd, speed: 0.0009, content: {
-                        title: 'Procedural Worlds',
-                        description: '3D Art & Generation',
-                        details: ['Infinite landscapes', 'Procedural generation algorithms', '3D rendering']
+                    name: 'MinNav', orbit: 35, size: 7.5, color: 0x9d4edd, speed: 0.0010, content: {
+                        title: 'MinNav',
+                        description: 'Accepted ICRA 2026 / Submitted IEEE RAL',
+                        details: ['Optical flow navigation for tiny drones', 'Complex cluttered indoor navigation', 'Integrated on low-power edge platforms']
                     }
                 },
                 {
-                    name: 'Nightscapes', orbit: 60, size: 7, color: 0xb168e8, speed: 0.0007, content: {
-                        title: 'Urban Nightscapes',
-                        description: 'Photography',
-                        details: ['Long exposure', 'City lights', 'Urban exploration']
+                    name: 'Robot Grasping', orbit: 50, size: 8, color: 0xae70ed, speed: 0.0008, content: {
+                        title: 'Robot Grasping & Manipulation',
+                        description: 'ELPIS Lab Research (WPI)',
+                        details: ['End-to-end reinforcement learning', 'UR10 pick-and-place', 'Language-grounded vision models']
                     }
                 },
                 {
-                    name: 'Cosmic Beats', orbit: 80, size: 7.5, color: 0xc77dff, speed: 0.0005, content: {
-                        title: 'Cosmic Beats',
-                        description: 'Music Production',
-                        details: ['Space-inspired ambient', 'Synth-wave', 'Electronic music']
+                    name: 'RIGGU V2', orbit: 65, size: 7, color: 0xbe82f0, speed: 0.0007, content: {
+                        title: 'RIGGU V2 Semi-Humanoid',
+                        description: 'Interactive Robotics Platform',
+                        details: ['ROS & SLAM navigation framework', 'AI and Natural Language Processing integration', 'Mechanical fabrication and hardware tuning']
+                    }
+                },
+                {
+                    name: 'Indoor Nav', orbit: 80, size: 6.5, color: 0xce95f2, speed: 0.0006, content: {
+                        title: 'Indoor Robot Navigation',
+                        description: 'Embodied Agent Motion Planning',
+                        details: ['A* & RRT traditional planners comparison', 'End-to-end Reinforcement Learning approaches', 'Embodied navigation in simulated environments']
+                    }
+                },
+                {
+                    name: '3R Manipulator', orbit: 95, size: 6, color: 0xdea8f5, speed: 0.0005, content: {
+                        title: '3R Link Manipulator Dynamics',
+                        description: 'Robot Kinematics & Manipulation',
+                        details: ['Kinematic and dynamic modeling', 'Workspace trajectory control', 'MATLAB/Python numerical simulations']
+                    }
+                },
+                {
+                    name: 'Alien Catcher', orbit: 110, size: 6, color: 0xeebbf7, speed: 0.0004, content: {
+                        title: 'Alien Catcher UAV Control',
+                        description: 'LQR Quadrotor Guidance',
+                        details: ['Linear Quadratic Regulator control strategy', 'Autonomous UAV intercept & capture', 'Dynamic simulation in 3D physics engine']
                     }
                 }
             ]
@@ -244,17 +272,31 @@ function createSolarSystems() {
             starColor: 0x4361ee,
             planets: [
                 {
-                    name: 'WPI', orbit: 50, size: 8, color: 0x4361ee, speed: 0.0008, content: {
-                        title: 'Worcester Polytechnic Institute',
-                        description: 'Master of Science in Robotics',
-                        details: ['GPA: 4.0', 'Focus: AI & Perception', '2023 - 2025']
+                    name: 'WPI', orbit: 40, size: 8, color: 0x4361ee, speed: 0.0010, content: {
+                        title: 'Worcester Polytechnic Institute (WPI)',
+                        description: 'MS in Robotics Engineering (Aug 2023 - May 2025)',
+                        details: ['GPA: 4.0/4.0', 'Focus: Robot Control, Dynamics, Motion Planning, Swarm Robotics', 'Thesis: MonoEye (Monocular Visual Odometry on Edge)']
                     }
                 },
                 {
-                    name: 'Undergrad', orbit: 70, size: 7, color: 0x5a7fd8, speed: 0.0006, content: {
-                        title: 'Bachelor of Technology',
-                        description: 'Electronics & Communication',
-                        details: ['Robotics Club Lead', 'Best Project Award', '2015 - 2019']
+                    name: 'IGNOU', orbit: 60, size: 7, color: 0x5371f0, speed: 0.0008, content: {
+                        title: 'Indira Gandhi National Open University (IGNOU)',
+                        description: 'Master of Arts in Philosophy (Oct 2020 - Dec 2022)',
+                        details: ['Part-time distance Master\'s degree', 'Focus: Epistemology, Logic, Ethics, Philosophy of Mind', 'Enhanced critical thinking and analytical modeling skills']
+                    }
+                },
+                {
+                    name: 'Hyderabad University', orbit: 80, size: 7, color: 0x6381f2, speed: 0.0006, content: {
+                        title: 'Central University of Hyderabad',
+                        description: 'Post Graduate Diploma in AI (Feb 2021 - Mar 2022)',
+                        details: ['Online diploma in collaboration with Applied Roots', 'Focus: Machine Learning, Deep Learning, CV, NLP', 'Minor Thesis: Multi-class classification on Cdiscount dataset']
+                    }
+                },
+                {
+                    name: 'Undergrad (NIT Calicut)', orbit: 100, size: 6.5, color: 0x7391f5, speed: 0.0004, content: {
+                        title: 'NIT Calicut',
+                        description: 'B.Tech in Mechanical Engineering (Jun 2015 - May 2019)',
+                        details: ['Core: Dynamics, Robotics, Control Systems, Thermal/Fluid Dynamics', 'Robotics Interest Group Club Lead', 'Honors / Best Project Award']
                     }
                 }
             ]
@@ -305,12 +347,12 @@ function createSystem(data) {
     group.position.set(data.position.x, data.position.y, data.position.z);
     group.userData.name = data.name;
 
-    // Create central star
+    // Create central star.
+    // MeshBasicMaterial is unlit and ignores emissive/emissiveIntensity;
+    // those fields are removed to avoid misleading dead properties.
     const starGeometry = new THREE.SphereGeometry(12, 32, 32);
     const starMaterial = new THREE.MeshBasicMaterial({
-        color: data.starColor,
-        emissive: data.starColor,
-        emissiveIntensity: 1
+        color: data.starColor
     });
     const star = new THREE.Mesh(starGeometry, starMaterial);
     group.add(star);
@@ -616,19 +658,29 @@ function updateInfoCardPosition() {
     const card = document.getElementById('planetInfoCard');
     if (!selectedObject || !card.classList.contains('active')) return;
 
-    // Get position of the object
+    // Project world position to 2D screen space.
     const position = new THREE.Vector3();
     selectedObject.getWorldPosition(position);
-
-    // Project to 2D screen space
     position.project(camera);
 
-    const x = (position.x * .5 + .5) * window.innerWidth;
-    const y = (-(position.y * .5) + .5) * window.innerHeight;
+    const rawX = (position.x *  0.5 + 0.5) * window.innerWidth;
+    const rawY = (-(position.y * 0.5) + 0.5) * window.innerHeight;
 
-    // Update card position
-    card.style.left = `${x}px`;
-    card.style.top = `${y}px`;
+    // Clamp so the card (300 × ~280 px) stays fully inside the viewport.
+    // The card is offset by transform: translate(-50%, -100%), so:
+    //   horizontal: half of card width (150) from each edge
+    //   vertical:   card height (280) from the top, 10px from the bottom
+    const CARD_HALF_W = 150;
+    const CARD_H      = 280;
+    const MARGIN      = 10;
+
+    const clampedX = Math.max(CARD_HALF_W + MARGIN,
+                     Math.min(rawX, window.innerWidth  - CARD_HALF_W - MARGIN));
+    const clampedY = Math.max(CARD_H + MARGIN,
+                     Math.min(rawY, window.innerHeight - MARGIN));
+
+    card.style.left = `${clampedX}px`;
+    card.style.top  = `${clampedY}px`;
 }
 
 function updateSystemInfo() {
@@ -657,29 +709,31 @@ function updateSystemInfo() {
 function setupEventListeners() {
     window.addEventListener('resize', onWindowResize);
 
+    // Helper: show the construction warning on first movement key press.
+    function triggerConstructionWarning() {
+        if (window.hasShownWarning) return;
+        const warning = document.getElementById('constructionWarning');
+        if (!warning) return;
+        warning.classList.add('visible');
+        window.hasShownWarning = true;
+        setTimeout(() => warning.classList.remove('visible'), 3000);
+    }
+
     window.addEventListener('keydown', (e) => {
         switch (e.key.toLowerCase()) {
-            case 'w':
-                controls.forward = true;
-
-                // Show construction warning on first move
-                const warning = document.getElementById('constructionWarning');
-                if (warning && !window.hasShownWarning) {
-                    console.log('Triggering construction warning'); // Debug
-                    warning.classList.add('visible');
-                    window.hasShownWarning = true;
-
-                    // Hide after 3 seconds
-                    setTimeout(() => {
-                        warning.classList.remove('visible');
-                    }, 3000);
-                }
+            case 'w': controls.forward  = true; triggerConstructionWarning(); break;
+            case 's': controls.backward = true; triggerConstructionWarning(); break;
+            case 'a': controls.left     = true; triggerConstructionWarning(); break;
+            case 'd': controls.right    = true; triggerConstructionWarning(); break;
+            case ' ':
+                controls.up = true;
+                e.preventDefault();
+                triggerConstructionWarning();
                 break;
-            case 's': controls.backward = true; break;
-            case 'a': controls.left = true; break;
-            case 'd': controls.right = true; break;
-            case ' ': controls.up = true; e.preventDefault(); break;
-            case 'shift': controls.down = true; break;
+            case 'shift':
+                controls.down = true;
+                triggerConstructionWarning();
+                break;
         }
     });
 
@@ -726,6 +780,9 @@ function setupEventListeners() {
         isDragging = false;
     });
 
+    // { passive: false } is required so we can call e.preventDefault() inside
+    // and avoid the browser warning: "Unable to preventDefault inside passive
+    // event listener invocation."
     canvas.addEventListener('wheel', (e) => {
         if (currentView === '2D') {
             e.preventDefault();
@@ -736,13 +793,13 @@ function setupEventListeners() {
             const aspect = window.innerWidth / window.innerHeight;
             const frustumSize = 600 / zoomLevel;
 
-            camera2D.left = frustumSize * aspect / -2;
-            camera2D.right = frustumSize * aspect / 2;
-            camera2D.top = frustumSize / 2;
+            camera2D.left   = frustumSize * aspect / -2;
+            camera2D.right  = frustumSize * aspect / 2;
+            camera2D.top    = frustumSize / 2;
             camera2D.bottom = frustumSize / -2;
             camera2D.updateProjectionMatrix();
         }
-    });
+    }, { passive: false });
 
     // Mouse click to select planet
     canvas.addEventListener('click', onCanvasClick);
