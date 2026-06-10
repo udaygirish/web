@@ -2,73 +2,7 @@
 // Global Variables & Setup  
 // ========================================
 
-let scene, camera, renderer, composer;
-let starLayers = { near: null, mid: null, far: null };
-let wormholes = [];
-let lastWormholeUpdateTime = Date.now() * 0.001;
-let currentScene = 'loading';
-let isTransitioning = false;
-let lastWormholeExitTime = 0;
-let cockpitVisible = true;
-
-// Flight controls
-let moveForward = false;
-let moveBackward = false;
-let moveLeft = false;
-let moveRight = false;
-let moveUp = false;
-let moveDown = false;
-let velocity = new THREE.Vector3();
-let baseSpeed = 0.3;
-let speedBoost = false;
-let barrelRoll = 0;
-
-// Mouse look and steering
-let mouseX = 0;
-let mouseY = 0;
-let targetRotationY = 0;
-let targetRotationX = 0;
-let steeringMode = 'cone'; // 'free' (360° virtual joystick steer) or 'cone' (original direct clamped look-around)
-
-// Autopilot state
-let autopilotActive = false;
-let autopilotTarget = null;
-
-// Space Environment & Console state
-let spaceCrystals = [];
-let warpLinesGroup = null;
-let warpActive = false;
-let warpSpeedFactor = 0;
-let isConsoleTyping = false;
-let shieldEnergy = 100.0;
-let cameraShakeAmount = 0.0;
-
-// Sound Synthesizer & Co-Pilot voice state
-let audioCtx = null;
-let soundEnabled = false;
-let engineOsc = null;
-let engineFilter = null;
-let engineGain = null;
-let warpOsc = null;
-let warpNoiseNode = null;
-let warpGainNode = null;
-let warpNoiseGain = null;
-let lastIsWarping = false;
-
-// Upgraded Flight Systems state
-let powerMode = 'systems'; // 'systems', 'engines', 'shields'
-let hudReticle = null; // 3D target locking ring
-let crystalDebris = []; // particle shards from shatters
-let energyMatrixes = []; // harvestable energy cores
-let supernovaActive = false; // solar flare trigger state
-let supernovaTime = 0; // solar flare timer
-
-const SCENES = {
-    LOADING: 'loading',
-    COCKPIT: 'cockpit',
-    OPEN_SPACE: 'openSpace',
-    WORMHOLE_TRAVEL: 'wormholeTravel'
-};
+// Globals have been moved to js/state.js to support ES6 module refactoring
 
 // Placeholder for WORMHOLE_CONFIG, assuming it's defined elsewhere or will be added.
 // For the purpose of this edit, we'll assume it's available.
@@ -111,7 +45,7 @@ function initScene() {
     composer.addPass(renderPass);
 
     // Bloom pass for glowing wormholes and particles
-    const bloomPass = new THREE.UnrealBloomPass(
+    bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
         1.5,  // strength - intensity of glow
         0.4,  // radius - how far glow spreads
@@ -656,52 +590,68 @@ function createStarfield() {
     scene.add(starLayers.far);
 }
 
+let spaceCrystalsMesh;
+let spaceCrystalsData = [];
+
 function createSpaceCrystals() {
     // Colors matching the wormholes
     const colors = [0x00ff88, 0x06ffa5, 0xff6b35, 0x4cc9f0, 0x9d4edd];
     const numCrystals = 45;
     
+    // We use a single geometry for the instanced mesh.
+    // Random scaling and rotation per-instance will provide organic diversity.
+    const geometry = new THREE.DodecahedronGeometry(1, 0);
+    const posAttr = geometry.attributes.position;
+    for (let j = 0; j < posAttr.count; j++) {
+        const x = posAttr.getX(j);
+        const y = posAttr.getY(j);
+        const z = posAttr.getZ(j);
+        const factor = 0.82 + Math.random() * 0.36;
+        posAttr.setXYZ(j, x * factor, y * factor, z * factor);
+    }
+    geometry.computeVertexNormals();
+    
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xffffff, // base color white so instance color multiplies cleanly
+        roughness: 0.15,
+        metalness: 0.85,
+        flatShading: true,
+        transparent: true,
+        opacity: 0.65,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.22,
+        blending: THREE.AdditiveBlending
+    });
+    
+    spaceCrystalsMesh = new THREE.InstancedMesh(geometry, material, numCrystals);
+    spaceCrystalsMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    
+    const dummy = new THREE.Object3D();
+    const colorObj = new THREE.Color();
+    
     for (let i = 0; i < numCrystals; i++) {
         const size = Math.random() * 2 + 1; // 1 to 3 units
-        const color = colors[i % colors.length];
+        const colorHex = colors[i % colors.length];
+        colorObj.setHex(colorHex);
         
-        // Low poly dodecahedron
-        const geometry = new THREE.DodecahedronGeometry(size, 0);
-        
-        // Deform vertices slightly to make organic crystals
-        const posAttr = geometry.attributes.position;
-        for (let j = 0; j < posAttr.count; j++) {
-            const x = posAttr.getX(j);
-            const y = posAttr.getY(j);
-            const z = posAttr.getZ(j);
-            const factor = 0.82 + Math.random() * 0.36; // 82% to 118% size
-            posAttr.setXYZ(j, x * factor, y * factor, z * factor);
-        }
-        geometry.computeVertexNormals();
-        
-        const material = new THREE.MeshStandardMaterial({
-            color: color,
-            roughness: 0.15,
-            metalness: 0.85,
-            flatShading: true,
-            transparent: true,
-            opacity: 0.65,
-            emissive: color,
-            emissiveIntensity: 0.22,
-            blending: THREE.AdditiveBlending
-        });
-        
-        const crystal = new THREE.Mesh(geometry, material);
-        
-        // Scatter around flight corridor
-        crystal.position.set(
+        // Initial positioning
+        dummy.position.set(
             (Math.random() - 0.5) * 360,
             (Math.random() - 0.5) * 220,
             -Math.random() * 320 + 20
         );
+        dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        dummy.scale.set(size, size, size);
+        dummy.updateMatrix();
         
-        // Spin speed & drift speed
-        crystal.userData = {
+        spaceCrystalsMesh.setMatrixAt(i, dummy.matrix);
+        spaceCrystalsMesh.setColorAt(i, colorObj);
+        
+        // Spin speed & drift speed data
+        spaceCrystalsData.push({
+            position: dummy.position.clone(),
+            rotation: dummy.rotation.clone(),
+            scale: dummy.scale.clone(),
             rotX: (Math.random() - 0.5) * 0.016,
             rotY: (Math.random() - 0.5) * 0.016,
             rotZ: (Math.random() - 0.5) * 0.016,
@@ -710,38 +660,52 @@ function createSpaceCrystals() {
                 (Math.random() - 0.5) * 0.04,
                 (Math.random() - 0.5) * 0.04
             ),
-            originalColor: color,
-            size: size
-        };
-        
-        scene.add(crystal);
-        spaceCrystals.push(crystal);
+            originalColor: colorHex,
+            size: size,
+            collided: false
+        });
     }
+    
+    spaceCrystalsMesh.instanceColor.needsUpdate = true;
+    scene.add(spaceCrystalsMesh);
 }
 
 function animateSpaceCrystals() {
-    spaceCrystals.forEach(crystal => {
-        crystal.rotation.x += crystal.userData.rotX;
-        crystal.rotation.y += crystal.userData.rotY;
-        crystal.rotation.z += crystal.userData.rotZ;
+    if (!spaceCrystalsMesh) return;
+    const dummy = new THREE.Object3D();
+    
+    for (let i = 0; i < spaceCrystalsData.length; i++) {
+        const data = spaceCrystalsData[i];
         
-        crystal.position.add(crystal.userData.drift);
+        data.rotation.x += data.rotX;
+        data.rotation.y += data.rotY;
+        data.rotation.z += data.rotZ;
+        
+        data.position.add(data.drift);
         
         // Keep them bounded
-        if (Math.abs(crystal.position.x) > 180) crystal.userData.drift.x *= -1;
-        if (Math.abs(crystal.position.y) > 110) crystal.userData.drift.y *= -1;
-        if (crystal.position.z < -340 || crystal.position.z > 40) crystal.userData.drift.z *= -1;
+        if (Math.abs(data.position.x) > 180) data.drift.x *= -1;
+        if (Math.abs(data.position.y) > 110) data.drift.y *= -1;
+        if (data.position.z < -340 || data.position.z > 40) data.drift.z *= -1;
+
+        dummy.position.copy(data.position);
+        dummy.rotation.copy(data.rotation);
+        dummy.scale.copy(data.scale);
+        dummy.updateMatrix();
+        
+        spaceCrystalsMesh.setMatrixAt(i, dummy.matrix);
 
         // Proximity Collision check
-        if (!crystal.userData.collided && currentScene === SCENES.OPEN_SPACE) {
-            const distance = camera.position.distanceTo(crystal.position);
-            // Threshold based on crystal size plus approximate ship size (3.5)
-            const threshold = (crystal.userData.size || 2) + 3.5;
+        if (!data.collided && currentScene === SCENES.OPEN_SPACE) {
+            const distance = camera.position.distanceTo(data.position);
+            const threshold = data.size + 3.5;
             if (distance < threshold) {
-                triggerCrystalCollision(crystal);
+                // Pass index instead of mesh to trigger collision color update
+                triggerCrystalCollision(i, data);
             }
         }
-    });
+    }
+    spaceCrystalsMesh.instanceMatrix.needsUpdate = true;
 }
 
 function updateShieldUI() {
@@ -773,10 +737,21 @@ function updateShieldUI() {
     }
 }
 
-function triggerCrystalCollision(crystal) {
-    crystal.userData.collided = true;
+function triggerCrystalCollision(index, data) {
+    data.collided = true;
+    
+    // Flash red
+    const flashColor = new THREE.Color(0xff0000);
+    const origColor = new THREE.Color(data.originalColor);
+    spaceCrystalsMesh.setColorAt(index, flashColor);
+    spaceCrystalsMesh.instanceColor.needsUpdate = true;
+    
     setTimeout(() => {
-        crystal.userData.collided = false;
+        data.collided = false;
+        if (spaceCrystalsMesh) {
+            spaceCrystalsMesh.setColorAt(index, origColor);
+            spaceCrystalsMesh.instanceColor.needsUpdate = true;
+        }
     }, 5000);
 
     // Play synthesized collision impact sound
@@ -1658,20 +1633,33 @@ function updateFlightControls() {
         // Calculate speed
         const moveSpeed = speedBoost ? baseSpeed * 2 : baseSpeed;
 
-        // Movement
-        velocity.set(0, 0, 0);
+        // Movement with inertia
+        const targetVelocity = new THREE.Vector3();
 
-        if (moveForward) velocity.z -= moveSpeed;
-        if (moveBackward) velocity.z += moveSpeed;
-        if (moveLeft) velocity.x -= moveSpeed;
-        if (moveRight) velocity.x += moveSpeed;
-        if (moveUp) velocity.y += moveSpeed;
-        if (moveDown) velocity.y -= moveSpeed;
+        if (moveForward) targetVelocity.z -= moveSpeed;
+        if (moveBackward) targetVelocity.z += moveSpeed;
+        if (moveLeft) targetVelocity.x -= moveSpeed;
+        if (moveRight) targetVelocity.x += moveSpeed;
+        if (moveUp) targetVelocity.y += moveSpeed;
+        if (moveDown) targetVelocity.y -= moveSpeed;
+
+        // Smoothly interpolate current velocity towards target (creates momentum/drift)
+        velocity.lerp(targetVelocity, 0.08);
 
         // Apply movement in camera's local space
         camera.translateX(velocity.x);
         camera.translateY(velocity.y);
         camera.translateZ(velocity.z);
+    }
+
+    // Dynamic FOV for warp sensation
+    const baseFov = 75;
+    const isWarping = (autopilotActive && autopilotTarget) || (speedBoost && moveForward);
+    const targetFov = isWarping ? 105 : baseFov;
+    
+    if (Math.abs(camera.fov - targetFov) > 0.1) {
+        camera.fov += (targetFov - camera.fov) * 0.05;
+        camera.updateProjectionMatrix();
     }
 
     // Explicitly update camera matrix so other computations use the current position/quaternion immediately
@@ -1927,10 +1915,31 @@ function animateWormholeTravel() {
     // Barrel roll effect
     camera.rotation.z += 0.02;
 
+    const travelTime = Date.now() - wormholeEntryTime;
+    
     // Parallax stars spin for wormhole effect
     if (starLayers.near) starLayers.near.rotation.y += 0.01;
     if (starLayers.mid) starLayers.mid.rotation.y += 0.008;
     if (starLayers.far) starLayers.far.rotation.y += 0.005;
+
+    // Hyper speed lines
+    animateWarpLines();
+    
+    // Intense Post-Processing Effect (Bloom white-out)
+    if (bloomPass) {
+        // Normal strength is 1.5. Smoothly ramp up to 10 as we get closer to 4000ms
+        const progress = Math.min(1.0, travelTime / 3500);
+        // Exponential curve for dramatic flash at the end
+        bloomPass.strength = 1.5 + Math.pow(progress, 4) * 15.0; 
+    }
+
+    // Fade to white / redirect logic
+    if (travelTime > 3000) {
+        document.getElementById('screen-flash').classList.add('active');
+        if (travelTime > 4000) {
+            window.location.href = wormholeTargetUrl;
+        }
+    }
 }
 
 // ========================================
@@ -1983,6 +1992,18 @@ function enterWormhole(wormhole) {
 
     // Remove wormholes
     wormholes.forEach(w => scene.remove(w.group));
+    
+    // Vocal announcement
+    speakCoPilot("Entering wormhole. Initiating dimensional shift.");
+    playWormholeSound();
+    
+    // Remove space crystals to declutter
+    if (spaceCrystalsMesh) {
+        scene.remove(spaceCrystalsMesh);
+        spaceCrystalsMesh = null;
+        spaceCrystalsData = [];
+    }
+    
     const destination = wormhole.destination;
     const color = wormhole.color;
     wormholes = [];
@@ -2528,6 +2549,76 @@ function onMouseMove(event) {
     if (steeringMode === 'cone') {
         targetRotationY = mouseX * Math.PI * 0.3;
         targetRotationX = mouseY * Math.PI * 0.15;
+    }
+}
+
+function initMobileControls() {
+    document.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+}
+
+function onTouchStart(event) {
+    if (isConsoleTyping) return;
+    
+    // Ignore UI touches
+    const target = event.target;
+    if (target.closest('.cockpit-panel') || target.closest('.cockpit-bottom') || target.closest('.hud-toggle-btn') || target.tagName === 'BUTTON') {
+        return;
+    }
+
+    if (event.touches.length > 0) {
+        const touch = event.touches[0];
+        mouseX = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouseY = -(touch.clientY / window.innerHeight) * 2 + 1;
+        
+        if (currentScene === SCENES.COCKPIT) {
+            startFlight();
+            return;
+        }
+
+        if (steeringMode === 'cone') {
+            targetRotationY = mouseX * Math.PI * 0.3;
+            targetRotationX = mouseY * Math.PI * 0.15;
+        }
+
+        // Tap with two fingers or hold screen = move forward
+        if (event.touches.length >= 2 && currentScene === SCENES.OPEN_SPACE) {
+            moveForward = true;
+            setCockpitKey('w', true);
+        } else {
+            // Mobile auto-forward: simple tap starts moving forward if in open space
+            if (currentScene === SCENES.OPEN_SPACE) {
+                moveForward = true;
+                setCockpitKey('w', true);
+            }
+        }
+    }
+}
+
+function onTouchMove(event) {
+    if (event.touches.length > 0 && currentScene === SCENES.OPEN_SPACE) {
+        // Prevent default scrolling on canvas
+        const target = event.target;
+        if (!target.closest('.cockpit-panel')) {
+            event.preventDefault(); 
+        }
+        
+        const touch = event.touches[0];
+        mouseX = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouseY = -(touch.clientY / window.innerHeight) * 2 + 1;
+        
+        if (steeringMode === 'cone') {
+            targetRotationY = mouseX * Math.PI * 0.3;
+            targetRotationX = mouseY * Math.PI * 0.15;
+        }
+    }
+}
+
+function onTouchEnd(event) {
+    if (event.touches.length === 0) {
+        moveForward = false;
+        setCockpitKey('w', false);
     }
 }
 
@@ -3079,14 +3170,14 @@ function fireMiningLaser() {
     // Raycaster to check intersection with space crystals
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const intersects = raycaster.intersectObjects(spaceCrystals);
+    const intersects = spaceCrystalsMesh ? raycaster.intersectObject(spaceCrystalsMesh) : [];
     
     let end = new THREE.Vector3();
-    let hitCrystal = null;
+    let hitCrystalIndex = -1;
     
     if (intersects.length > 0 && intersects[0].distance < 160) {
         end.copy(intersects[0].point);
-        hitCrystal = intersects[0].object;
+        hitCrystalIndex = intersects[0].instanceId;
     } else {
         // endpoint is 160 units forward
         end.set(0, 0, -160).applyMatrix4(camera.matrixWorld);
@@ -3115,16 +3206,19 @@ function fireMiningLaser() {
     }, 100);
     
     // If we hit a crystal, shatter it!
-    if (hitCrystal) {
-        shatterCrystal(hitCrystal, end);
+    if (hitCrystalIndex !== -1) {
+        shatterCrystal(hitCrystalIndex, end);
     }
 }
 
-function shatterCrystal(crystal, point) {
+function shatterCrystal(index, point) {
+    const data = spaceCrystalsData[index];
+    if (!data || data.scale.x <= 0.01) return; // already shattered
+
     // Play explosion sound
     playExplosionSound();
     
-    const debrisColor = crystal.userData.originalColor || 0x00ff88;
+    const debrisColor = data.originalColor || 0x00ff88;
     
     // 1. Spawn debris shards
     const debrisGeo = new THREE.DodecahedronGeometry(0.2, 0);
@@ -3162,17 +3256,22 @@ function shatterCrystal(crystal, point) {
         flatShading: true
     });
     const matrixMesh = new THREE.Mesh(matrixGeo, matrixMat);
-    matrixMesh.position.copy(crystal.position);
+    matrixMesh.position.copy(data.position);
     scene.add(matrixMesh);
     energyMatrixes.push(matrixMesh);
     
     // 3. Object Pool Respawn: Move crystal way in front so corridor stays populated
-    crystal.position.set(
+    data.position.set(
         (Math.random() - 0.5) * 360,
         (Math.random() - 0.5) * 220,
-        camera.position.z - 300 - Math.random() * 100
+        camera.position.z - (Math.random() * 200 + 150)
     );
-    crystal.userData.collided = false; // reset collision flag
+    data.collided = false;
+    // reset scale immediately
+    data.scale.set(data.size, data.size, data.size);
+    
+    writeToConsole(`MINING LASER SUCCESS. CRYSTAL YIELD OBTAINED.`);
+    speakCoPilot("Crystal shattered. Energy matrix exposed.");
 }
 
 // --- Dynamic Audio Beeps ---
