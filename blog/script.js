@@ -50,7 +50,16 @@ async function loadPost(post) {
         const response = await fetch(BLOG_CONFIG.postsFolder + post.file);
         if (!response.ok) throw new Error('Post not found');
 
-        const markdown = await response.text();
+        let markdown = await response.text();
+        
+        // Strip Jekyll front matter if present
+        if (markdown.trim().startsWith('---')) {
+            const parts = markdown.split('---');
+            if (parts.length >= 3) {
+                markdown = parts.slice(2).join('---').trim();
+            }
+        }
+        
         const html = marked.parse(markdown);
 
         content.innerHTML = `

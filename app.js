@@ -5,8 +5,11 @@
 let scene, camera, renderer, composer;
 let starLayers = { near: null, mid: null, far: null };
 let wormholes = [];
+let lastWormholeUpdateTime = Date.now() * 0.001;
 let currentScene = 'loading';
 let isTransitioning = false;
+let lastWormholeExitTime = 0;
+let cockpitVisible = true;
 
 // Flight controls
 let moveForward = false;
@@ -20,11 +23,45 @@ let baseSpeed = 0.3;
 let speedBoost = false;
 let barrelRoll = 0;
 
-// Mouse look
+// Mouse look and steering
 let mouseX = 0;
 let mouseY = 0;
 let targetRotationY = 0;
 let targetRotationX = 0;
+let steeringMode = 'cone'; // 'free' (360° virtual joystick steer) or 'cone' (original direct clamped look-around)
+
+// Autopilot state
+let autopilotActive = false;
+let autopilotTarget = null;
+
+// Space Environment & Console state
+let spaceCrystals = [];
+let warpLinesGroup = null;
+let warpActive = false;
+let warpSpeedFactor = 0;
+let isConsoleTyping = false;
+let shieldEnergy = 100.0;
+let cameraShakeAmount = 0.0;
+
+// Sound Synthesizer & Co-Pilot voice state
+let audioCtx = null;
+let soundEnabled = false;
+let engineOsc = null;
+let engineFilter = null;
+let engineGain = null;
+let warpOsc = null;
+let warpNoiseNode = null;
+let warpGainNode = null;
+let warpNoiseGain = null;
+let lastIsWarping = false;
+
+// Upgraded Flight Systems state
+let powerMode = 'systems'; // 'systems', 'engines', 'shields'
+let hudReticle = null; // 3D target locking ring
+let crystalDebris = []; // particle shards from shatters
+let energyMatrixes = []; // harvestable energy cores
+let supernovaActive = false; // solar flare trigger state
+let supernovaTime = 0; // solar flare timer
 
 const SCENES = {
     LOADING: 'loading',
@@ -57,6 +94,8 @@ function initScene() {
         1000
     );
     camera.position.set(0, 0, 5);
+    camera.rotation.order = 'YXZ';
+    scene.add(camera);
 
     renderer = new THREE.WebGLRenderer({
         canvas: document.getElementById('canvas'),
@@ -79,6 +118,20 @@ function initScene() {
         0.85  // threshold - only bright objects glow
     );
     composer.addPass(bloomPass);
+
+    // Build 3D target lock-on reticle ring
+    const reticleGeo = new THREE.RingGeometry(8, 8.8, 32);
+    const reticleMat = new THREE.MeshBasicMaterial({
+        color: 0xffaa00,
+        transparent: true,
+        opacity: 0,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+    });
+    hudReticle = new THREE.Mesh(reticleGeo, reticleMat);
+    hudReticle.visible = false;
+    scene.add(hudReticle);
 
     setupEventListeners();
 }
@@ -117,6 +170,8 @@ function handleReturnFromSite(siteId) {
     // Position camera at tunnel center
     camera.position.set(0, 0, 0);
     camera.rotation.set(0, 0, 0);
+    targetRotationY = 0;
+    targetRotationX = 0;
 
     // Create reverse tunnel
     createReverseWormholeTunnel(wormholeConfig.color, wormholeConfig);
@@ -230,6 +285,8 @@ function exitToOpenSpace(wormholeConfig) {
 
     // Reset camera rotation
     camera.rotation.set(0, 0, 0);
+    targetRotationY = 0;
+    targetRotationX = 0;
 
     // Position camera at the wormhole location
     camera.position.set(
@@ -240,12 +297,16 @@ function exitToOpenSpace(wormholeConfig) {
 
     // Set to open space
     currentScene = SCENES.OPEN_SPACE;
+    lastWormholeExitTime = Date.now();
 
-    // Create all wormholes and nebula
+    // Create all space objects
     createWormholes();
     createNebula();
+    createSpaceCrystals();
+    createWarpLines();
 
     isTransitioning = false;
+    showCockpitBezel();
 
     // Clear URL parameter so reload shows full loading sequence
     if (window.history.replaceState) {
@@ -595,6 +656,273 @@ function createStarfield() {
     scene.add(starLayers.far);
 }
 
+function createSpaceCrystals() {
+    // Colors matching the wormholes
+    const colors = [0x00ff88, 0x06ffa5, 0xff6b35, 0x4cc9f0, 0x9d4edd];
+    const numCrystals = 45;
+    
+    for (let i = 0; i < numCrystals; i++) {
+        const size = Math.random() * 2 + 1; // 1 to 3 units
+        const color = colors[i % colors.length];
+        
+        // Low poly dodecahedron
+        const geometry = new THREE.DodecahedronGeometry(size, 0);
+        
+        // Deform vertices slightly to make organic crystals
+        const posAttr = geometry.attributes.position;
+        for (let j = 0; j < posAttr.count; j++) {
+            const x = posAttr.getX(j);
+            const y = posAttr.getY(j);
+            const z = posAttr.getZ(j);
+            const factor = 0.82 + Math.random() * 0.36; // 82% to 118% size
+            posAttr.setXYZ(j, x * factor, y * factor, z * factor);
+        }
+        geometry.computeVertexNormals();
+        
+        const material = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.15,
+            metalness: 0.85,
+            flatShading: true,
+            transparent: true,
+            opacity: 0.65,
+            emissive: color,
+            emissiveIntensity: 0.22,
+            blending: THREE.AdditiveBlending
+        });
+        
+        const crystal = new THREE.Mesh(geometry, material);
+        
+        // Scatter around flight corridor
+        crystal.position.set(
+            (Math.random() - 0.5) * 360,
+            (Math.random() - 0.5) * 220,
+            -Math.random() * 320 + 20
+        );
+        
+        // Spin speed & drift speed
+        crystal.userData = {
+            rotX: (Math.random() - 0.5) * 0.016,
+            rotY: (Math.random() - 0.5) * 0.016,
+            rotZ: (Math.random() - 0.5) * 0.016,
+            drift: new THREE.Vector3(
+                (Math.random() - 0.5) * 0.04,
+                (Math.random() - 0.5) * 0.04,
+                (Math.random() - 0.5) * 0.04
+            ),
+            originalColor: color,
+            size: size
+        };
+        
+        scene.add(crystal);
+        spaceCrystals.push(crystal);
+    }
+}
+
+function animateSpaceCrystals() {
+    spaceCrystals.forEach(crystal => {
+        crystal.rotation.x += crystal.userData.rotX;
+        crystal.rotation.y += crystal.userData.rotY;
+        crystal.rotation.z += crystal.userData.rotZ;
+        
+        crystal.position.add(crystal.userData.drift);
+        
+        // Keep them bounded
+        if (Math.abs(crystal.position.x) > 180) crystal.userData.drift.x *= -1;
+        if (Math.abs(crystal.position.y) > 110) crystal.userData.drift.y *= -1;
+        if (crystal.position.z < -340 || crystal.position.z > 40) crystal.userData.drift.z *= -1;
+
+        // Proximity Collision check
+        if (!crystal.userData.collided && currentScene === SCENES.OPEN_SPACE) {
+            const distance = camera.position.distanceTo(crystal.position);
+            // Threshold based on crystal size plus approximate ship size (3.5)
+            const threshold = (crystal.userData.size || 2) + 3.5;
+            if (distance < threshold) {
+                triggerCrystalCollision(crystal);
+            }
+        }
+    });
+}
+
+function updateShieldUI() {
+    const shieldValEl = document.getElementById('cp-shield-val');
+    const shieldBarEl = document.getElementById('cp-shield-bar');
+    if (shieldValEl) {
+        shieldValEl.textContent = `${Math.round(shieldEnergy)}%`;
+        shieldValEl.className = 'pv';
+        if (shieldEnergy > 50) {
+            shieldValEl.classList.add('ok');
+        } else if (shieldEnergy > 20) {
+            shieldValEl.classList.add('warn');
+        } else {
+            shieldValEl.classList.add('alert');
+        }
+    }
+    if (shieldBarEl) {
+        shieldBarEl.style.width = `${shieldEnergy}%`;
+        if (shieldEnergy > 50) {
+            shieldBarEl.style.backgroundColor = '#00ff88';
+            shieldBarEl.style.boxShadow = '0 0 6px rgba(0, 255, 136, 0.7)';
+        } else if (shieldEnergy > 20) {
+            shieldBarEl.style.backgroundColor = '#ffaa00';
+            shieldBarEl.style.boxShadow = '0 0 6px rgba(255, 170, 0, 0.7)';
+        } else {
+            shieldBarEl.style.backgroundColor = '#ff3333';
+            shieldBarEl.style.boxShadow = '0 0 6px rgba(255, 51, 51, 0.7)';
+        }
+    }
+}
+
+function triggerCrystalCollision(crystal) {
+    crystal.userData.collided = true;
+    setTimeout(() => {
+        crystal.userData.collided = false;
+    }, 5000);
+
+    // Play synthesized collision impact sound
+    playExplosionSound();
+
+    // Trigger Camera Shake Amount
+    cameraShakeAmount = 0.45;
+
+    // Apply shield damage (15% to 30% random)
+    const damage = 15 + Math.random() * 15;
+    shieldEnergy = Math.max(0, shieldEnergy - damage);
+    updateShieldUI();
+
+    // Alert via HUD warning
+    showNavAlert("WARNING: COLLISION DETECTED", "SHIELD ENVELOPE DAMPENING IMPACT", 3000);
+    
+    // Vocal warning announcements
+    speakCoPilot(`Alert! Crystal collision detected. Shields reduced to ${Math.round(shieldEnergy)} percent.`);
+
+    // System diagnostic write to Console
+    const cpX = camera.position.x.toFixed(2);
+    const cpY = camera.position.y.toFixed(2);
+    const cpZ = camera.position.z.toFixed(2);
+    writeToConsole(`[WARNING] METEOR COLLISION AT SECTOR (${cpX}, ${cpY}, ${cpZ})`);
+    writeToConsole(`SHIELD ENERGY ATTENUATED: ${shieldEnergy.toFixed(1)}%`);
+
+    // Temporary emissive intensity increase and flash red
+    if (crystal.material) {
+        const originalIntensity = crystal.material.emissiveIntensity || 0.22;
+        const originalColor = crystal.userData.originalColor || 0x00ff88;
+        
+        crystal.material.emissiveIntensity = 2.5;
+        crystal.material.color.setHex(0xff3333); // flash red
+        
+        setTimeout(() => {
+            if (crystal.material) {
+                crystal.material.emissiveIntensity = originalIntensity;
+                crystal.material.color.setHex(originalColor);
+            }
+        }, 400);
+    }
+}
+
+function createWarpLines() {
+    warpLinesGroup = new THREE.Group();
+    warpLinesGroup.name = 'warp-lines';
+    
+    const colors = [0x00ff88, 0x00d9ff, 0x9d4edd];
+    const numLines = 250;
+    
+    for (let i = 0; i < numLines; i++) {
+        const length = Math.random() * 25 + 15;
+        const color = colors[i % colors.length];
+        
+        const geometry = new THREE.BufferGeometry();
+        const vertices = new Float32Array([
+            0, 0, 0,
+            0, 0, -length
+        ]);
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        
+        const material = new THREE.LineBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0, // start invisible, will slerp in when warp active
+            blending: THREE.AdditiveBlending
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        
+        // Scatter lines throughout space
+        line.position.set(
+            (Math.random() - 0.5) * 400,
+            (Math.random() - 0.5) * 400,
+            (Math.random() - 0.5) * 400
+        );
+        
+        warpLinesGroup.add(line);
+    }
+    
+    camera.add(warpLinesGroup);
+}
+
+function animateWarpLines() {
+    if (!warpLinesGroup) return;
+    
+    // Check warp state
+    // Autopilot or shiftKey forces warp drive active
+    const isWarping = warpActive || (currentScene === SCENES.OPEN_SPACE && autopilotActive) || (currentScene === SCENES.OPEN_SPACE && speedBoost);
+    
+    const targetWarpOpacity = isWarping ? 0.75 : 0;
+    const targetStarOpacity = isWarping ? 0.05 : 0.85;
+    
+    // Fade stars in/out
+    if (starLayers.near) starLayers.near.material.opacity = THREE.MathUtils.lerp(starLayers.near.material.opacity, targetStarOpacity, 0.06);
+    if (starLayers.mid) starLayers.mid.material.opacity = THREE.MathUtils.lerp(starLayers.mid.material.opacity, targetStarOpacity, 0.06);
+    if (starLayers.far) starLayers.far.material.opacity = THREE.MathUtils.lerp(starLayers.far.material.opacity, targetStarOpacity, 0.06);
+    
+    // Accelerate/Decelerate warp line velocity
+    const targetWarpSpeed = isWarping ? 20 : 0;
+    warpSpeedFactor = THREE.MathUtils.lerp(warpSpeedFactor, targetWarpSpeed, 0.05);
+    
+    // Trigger warp sound transitions and TTS announcements
+    if (isWarping !== lastIsWarping) {
+        playWarpSpoolSound(isWarping);
+        if (isWarping) {
+            speakCoPilot("Hyperdrive engaged. Entering warp speeds.");
+        } else {
+            speakCoPilot("Hyperdrive disengaged.");
+        }
+        lastIsWarping = isWarping;
+    }
+    
+    // Align warp lines group rotation with travel direction
+    let travelSpeed = 0;
+    const targetLookAt = new THREE.Vector3(0, 0, 1);
+    if (autopilotActive && autopilotTarget) {
+        travelSpeed = baseSpeed * 1.5;
+        targetLookAt.set(0, 0, 1);
+    } else {
+        const velSpeedSq = velocity.lengthSq();
+        if (velSpeedSq > 0.0001) {
+            travelSpeed = velocity.length();
+            targetLookAt.copy(velocity).multiplyScalar(-1).normalize();
+        }
+    }
+    
+    const targetQuat = new THREE.Quaternion();
+    targetQuat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetLookAt);
+    warpLinesGroup.quaternion.slerp(targetQuat, 0.1);
+    
+    warpLinesGroup.children.forEach(line => {
+        line.material.opacity = THREE.MathUtils.lerp(line.material.opacity, targetWarpOpacity, 0.06);
+        
+        // Fly forward along Z local
+        line.position.z += (warpSpeedFactor + travelSpeed);
+        
+        // Wrap back around if passing cockpit view
+        if (line.position.z > 40) {
+            line.position.z = -360;
+            line.position.x = (Math.random() - 0.5) * 400;
+            line.position.y = (Math.random() - 0.5) * 400;
+        }
+    });
+}
+
 function createWormholes() {
     wormholes.forEach(w => scene.remove(w.group));
     wormholes = [];
@@ -610,7 +938,9 @@ function createWormholes() {
             group: group,
             type: config.id,
             color: config.color,
-            destination: config.destination
+            destination: config.destination,
+            config: config,
+            particleTime: 0.0
         });
     });
 }
@@ -765,79 +1095,100 @@ function createLightRays(color) {
 
 function createAccretionParticles(color) {
     const particlesGroup = new THREE.Group();
-    const numParticles = 500; // Increased for denser field
+    const numParticles = 500;
+    const maxRadius = 35;
 
-    const positions = new Float32Array(numParticles * 3);
-    const sizes = new Float32Array(numParticles);
-    const opacities = new Float32Array(numParticles);
+    // Per-particle immutable attributes stored on GPU buffers.
+    // The vertex shader reads these along with a time uniform to compute
+    // the animated position, eliminating per-frame CPU trig work.
+    const initialAngles  = new Float32Array(numParticles);
+    const initialRadii   = new Float32Array(numParticles);
+    const heights        = new Float32Array(numParticles);
+    const sizes          = new Float32Array(numParticles);
+    const baseOpacities  = new Float32Array(numParticles);
+    // orbitSpeeds encodes a per-particle random speed variation (GPU-side).
+    const orbitSpeeds    = new Float32Array(numParticles);
 
     for (let i = 0; i < numParticles; i++) {
-        // Distribute particles in a circular disk around the wormhole
-        const angle = Math.random() * Math.PI * 2;
-
-        // Use square root for more uniform circular distribution
-        const maxRadius = 35;
+        const angle  = Math.random() * Math.PI * 2;
         const radius = Math.sqrt(Math.random()) * maxRadius;
-
-        // Height varies less at outer edges for disk shape
         const heightFactor = 1 - (radius / maxRadius) * 0.5;
         const height = (Math.random() - 0.5) * 10 * heightFactor;
-
-        positions[i * 3] = Math.cos(angle) * radius;
-        positions[i * 3 + 1] = Math.sin(angle) * radius;
-        positions[i * 3 + 2] = height;
-
-        // Size decreases toward edges
         const distanceFromCenter = radius / maxRadius;
-        sizes[i] = (1 - distanceFromCenter * 0.5) * (Math.random() * 1.5 + 0.5);
-
-        // Opacity fades out smoothly from center to edge (circular fade)
-        // Using exponential falloff for more natural appearance
         const falloff = Math.pow(1 - distanceFromCenter, 2);
-        opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+
+        initialAngles[i]  = angle;
+        initialRadii[i]   = radius;
+        heights[i]        = height;
+        sizes[i]          = (1 - distanceFromCenter * 0.5) * (Math.random() * 1.5 + 0.5);
+        baseOpacities[i]  = falloff * (0.7 + Math.random() * 0.3);
+        // Outer particles orbit slightly slower (realistic accretion dynamics).
+        orbitSpeeds[i]    = 1.0 + (1.0 - distanceFromCenter) * 0.5;
     }
 
     const particleGeometry = new THREE.BufferGeometry();
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    particleGeometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
+    particleGeometry.setAttribute('initialAngle',  new THREE.BufferAttribute(initialAngles, 1));
+    particleGeometry.setAttribute('initialRadius', new THREE.BufferAttribute(initialRadii,  1));
+    particleGeometry.setAttribute('height',        new THREE.BufferAttribute(heights,       1));
+    particleGeometry.setAttribute('size',          new THREE.BufferAttribute(sizes,         1));
+    particleGeometry.setAttribute('baseOpacity',   new THREE.BufferAttribute(baseOpacities, 1));
+    particleGeometry.setAttribute('orbitSpeed',    new THREE.BufferAttribute(orbitSpeeds,   1));
 
-    // Custom shader material for per-particle opacity
     const particleMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            color: { value: new THREE.Color(color) },
-            pointTexture: { value: null }
+            color:     { value: new THREE.Color(color) },
+            time:      { value: 0.0 },
+            maxRadius: { value: maxRadius }
         },
         vertexShader: `
+            attribute float initialAngle;
+            attribute float initialRadius;
+            attribute float height;
             attribute float size;
-            attribute float opacity;
+            attribute float baseOpacity;
+            attribute float orbitSpeed;
+
+            uniform float time;
+            uniform float maxRadius;
+
             varying float vOpacity;
-            
+
             void main() {
-                vOpacity = opacity;
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                // Particles slowly spiral inward; when too close they reset to outer edge.
+                // All arithmetic runs in parallel on the GPU.
+                float angle  = initialAngle + time * 0.5 * orbitSpeed;
+                float radius = initialRadius;
+
+                // Compute animated XY position in the disk plane.
+                float x = cos(angle) * radius;
+                float y = sin(angle) * radius;
+
+                // Opacity fades smoothly from center to edge.
+                float distNorm = radius / maxRadius;
+                float falloff  = pow(1.0 - distNorm, 2.0);
+                vOpacity = falloff * baseOpacity;
+
+                vec4 mvPosition = modelViewMatrix * vec4(x, y, height, 1.0);
                 gl_PointSize = size * (300.0 / -mvPosition.z);
-                gl_Position = projectionMatrix * mvPosition;
+                gl_Position  = projectionMatrix * mvPosition;
             }
         `,
         fragmentShader: `
             uniform vec3 color;
             varying float vOpacity;
-            
+
             void main() {
-                // Circular particle shape
-                vec2 center = gl_PointCoord - vec2(0.5);
-                float dist = length(center);
+                // Circular soft-edged particle.
+                vec2  center = gl_PointCoord - vec2(0.5);
+                float dist   = length(center);
                 if (dist > 0.5) discard;
-                
-                // Soft edge
                 float alpha = (1.0 - dist * 2.0) * vOpacity;
                 gl_FragColor = vec4(color, alpha);
             }
         `,
         transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
+        blending:    THREE.AdditiveBlending,
+        depthWrite:  false
     });
 
     const particles = new THREE.Points(particleGeometry, particleMaterial);
@@ -877,6 +1228,38 @@ function createLensFlare(color) {
 }
 
 
+function createLightningGroup(color) {
+    const group = new THREE.Group();
+    group.name = 'lightning';
+
+    const numLines = 3;
+    const pointsPerLine = 10;
+
+    for (let i = 0; i < numLines; i++) {
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(pointsPerLine * 3);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const material = new THREE.LineBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending,
+            linewidth: 2
+        });
+
+        const line = new THREE.Line(geometry, material);
+        line.name = `bolt_${i}`;
+        line.userData = {
+            active: false,
+            opacity: 0.0
+        };
+        group.add(line);
+    }
+
+    return group;
+}
+
 function createWormholeGroup(color, label) {
     const group = new THREE.Group();
 
@@ -908,11 +1291,14 @@ function createWormholeGroup(color, label) {
     const lensFlare = createLensFlare(color);
     group.add(lensFlare);
 
-    // 8. Label
+    // 8. Space Lightning (electro-magnetic arcs)
+    const lightning = createLightningGroup(color);
+    group.add(lightning);
+
+    // 9. Label
     const labelSprite = createTextLabel(label, color);
     labelSprite.position.y = 18;
     group.add(labelSprite);
-
 
     return group;
 }
@@ -999,10 +1385,185 @@ function createWormholeTunnel(color) {
 function animate() {
     requestAnimationFrame(animate);
 
-    if (currentScene === SCENES.OPEN_SPACE) {
-        updateFlightControls();
-        checkWormholeProximity();
+    if (currentScene === SCENES.OPEN_SPACE || currentScene === SCENES.COCKPIT) {
+        if (currentScene === SCENES.OPEN_SPACE) {
+            updateFlightControls();
+            checkWormholeProximity();
+        }
         animateWormholes();
+        animateSpaceCrystals();
+        animateWarpLines();
+        
+        // Cockpit shield regeneration (dependent on powerMode shunts)
+        if (shieldEnergy < 100) {
+            let regenRate = 0.05; // systems balanced
+            if (powerMode === 'shields') {
+                regenRate = 0.20; // 4x fast regen
+            } else if (powerMode === 'engines') {
+                regenRate = 0.0; // offline!
+            }
+            if (regenRate > 0) {
+                shieldEnergy = Math.min(100, shieldEnergy + regenRate);
+                updateShieldUI();
+            }
+        }
+        
+        // Update 3D target lock reticle ring
+        if (hudReticle) {
+            let nearest = null;
+            let minDist = Infinity;
+            wormholes.forEach(w => {
+                const dist = camera.position.distanceTo(w.group.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = w;
+                }
+            });
+            
+            if (nearest && minDist < 250) {
+                hudReticle.visible = true;
+                hudReticle.position.copy(nearest.group.position);
+                hudReticle.lookAt(camera.position);
+                
+                // Pulsing animation
+                const pulse = 1.0 + Math.sin(Date.now() * 0.005) * 0.08;
+                
+                if (minDist > 85) {
+                    hudReticle.scale.set(pulse * 1.5, pulse * 1.5, 1);
+                    hudReticle.material.color.setHex(0xffaa00); // orange scan
+                    hudReticle.material.opacity = 0.5;
+                    hudReticle.rotation.z += 0.01;
+                    nearest.group.userData.lockAnnounced = false; // reset flag
+                } else if (minDist > 30) {
+                    const progress = (minDist - 30) / 55;
+                    const scaleFactor = 0.8 + progress * 0.7;
+                    hudReticle.scale.set(pulse * scaleFactor, pulse * scaleFactor, 1);
+                    hudReticle.material.color.setHex(0xffaa00);
+                    hudReticle.material.opacity = 0.75;
+                    hudReticle.rotation.z += 0.035;
+                } else {
+                    hudReticle.scale.set(pulse * 0.75, pulse * 0.75, 1);
+                    hudReticle.material.color.setHex(0x00ff88); // green lock-on!
+                    hudReticle.material.opacity = 0.95;
+                    hudReticle.rotation.z += 0.08;
+                    
+                    if (!nearest.group.userData.lockAnnounced && currentScene === SCENES.OPEN_SPACE) {
+                        nearest.group.userData.lockAnnounced = true;
+                        playLockChirp();
+                        speakCoPilot(`Course locked on target ${nearest.config.label.toUpperCase()}`);
+                    }
+                }
+            } else {
+                hudReticle.visible = false;
+            }
+        }
+        
+        // Update physics of crystal debris particles
+        for (let i = crystalDebris.length - 1; i >= 0; i--) {
+            const debris = crystalDebris[i];
+            debris.position.add(debris.userData.velocity);
+            debris.scale.multiplyScalar(debris.userData.scaleDecay);
+            debris.material.opacity = debris.scale.x;
+            if (debris.scale.x < 0.05) {
+                scene.remove(debris);
+                crystalDebris.splice(i, 1);
+            }
+        }
+        
+        // Update physics of energy matrixes (tractor beam pull)
+        for (let i = energyMatrixes.length - 1; i >= 0; i--) {
+            const em = energyMatrixes[i];
+            em.rotation.x += 0.02;
+            em.rotation.y += 0.02;
+            
+            // Lerp towards camera position
+            em.position.lerp(camera.position, 0.035);
+            
+            const dist = em.position.distanceTo(camera.position);
+            if (dist < 6.0) {
+                scene.remove(em);
+                energyMatrixes.splice(i, 1);
+                
+                // Recover shield
+                shieldEnergy = Math.min(100, shieldEnergy + 12.0);
+                updateShieldUI();
+                playPickupSound();
+                writeToConsole("[INFO] ENERGY HARVESTED. SHIELDS INCREASED +12.0%.");
+                speakCoPilot("Energy matrix harvested. Shields restored.");
+            }
+        }
+        
+        // Rare Solar Supernova Event triggers (1/8000 chance per frame)
+        if (!supernovaActive && Math.random() < 0.00012) {
+            supernovaActive = true;
+            supernovaTime = 100; // lasts 100 frames
+            playRumbleSound();
+            
+            // Flash scene white
+            scene.fog.color.setHex(0xffffff);
+            scene.fog.density = 0.025;
+            
+            writeToConsole("[WARNING] SOLAR CORONAL MASS EJECTION DETECTED. ELECTROMAGNETIC FLUX WARNING.");
+            speakCoPilot("Caution! Solar radiation flare detected. Cockpit shields dampening interference.");
+        }
+        
+        // Decaying solar flare fog and HUD flicker effect
+        if (supernovaActive) {
+            supernovaTime--;
+            
+            const uiEl = document.getElementById('ui-container');
+            if (supernovaTime > 0) {
+                // Glitchy HUD opacity flickers
+                if (uiEl) {
+                    uiEl.style.opacity = Math.random() > 0.35 ? '0.9' : '0.2';
+                }
+                // Fog decay slerp
+                scene.fog.density = THREE.MathUtils.lerp(scene.fog.density, 0.001, 0.02);
+                scene.fog.color.lerp(new THREE.Color(0x000000), 0.02);
+            } else {
+                supernovaActive = false;
+                if (uiEl) uiEl.style.opacity = '1.0';
+                scene.fog.color.setHex(0x000000);
+                scene.fog.density = 0.001;
+            }
+        }
+        
+        // Dynamic engine hum frequency and volume scaling
+        if (soundEnabled && audioCtx && engineOsc && engineGain) {
+            let speedC = 0;
+            if (autopilotActive) {
+                speedC = baseSpeed * 1.5 * 0.01;
+            } else {
+                speedC = velocity.length() * 0.01;
+            }
+            const targetFreq = 45 + speedC * 2000;
+            engineOsc.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.15);
+            
+            const targetVolume = 0.12 + speedC * 1.5;
+            engineGain.gain.setTargetAtTime(targetVolume, audioCtx.currentTime, 0.1);
+        }
+        
+        // Apply camera shake if active
+        if (cameraShakeAmount > 0.005) {
+            const shakeX = (Math.random() - 0.5) * cameraShakeAmount;
+            const shakeY = (Math.random() - 0.5) * cameraShakeAmount;
+            const shakeZ = (Math.random() - 0.5) * cameraShakeAmount;
+            
+            // Ensure Euler rotation is synchronized with the quaternion (essential for autopilot slerp)
+            camera.rotation.setFromQuaternion(camera.quaternion);
+            
+            camera.rotation.x += shakeX;
+            camera.rotation.y += shakeY;
+            camera.rotation.z += shakeZ;
+            
+            cameraShakeAmount *= 0.88;
+        } else {
+            cameraShakeAmount = 0;
+        }
+        
+        if (typeof updateRadar === 'function') {
+            updateRadar();
+        }
     } else if (currentScene === SCENES.WORMHOLE_TRAVEL) {
         // Check if this is a reverse travel (returning)
         if (scene.userData.exitWormhole) {
@@ -1016,40 +1577,113 @@ function animate() {
 }
 
 function updateFlightControls() {
-    // Apply rotation from mouse
-    camera.rotation.y = targetRotationY;
-    camera.rotation.x = targetRotationX;
-
-    // Apply barrel roll
-    if (barrelRoll !== 0) {
-        camera.rotation.z += barrelRoll * 0.05;
-        barrelRoll *= 0.95;
-        if (Math.abs(barrelRoll) < 0.01) barrelRoll = 0;
+    // Autopilot check override
+    if (autopilotActive && autopilotTarget) {
+        if (moveForward || moveBackward || moveLeft || moveRight || moveUp || moveDown || barrelRoll !== 0) {
+            disableAutopilot();
+            showNavAlert('AUTOPILOT CANCELLED', 'MANUAL OVERRIDE DETECTED');
+        }
     }
 
-    // Calculate speed
-    const moveSpeed = speedBoost ? baseSpeed * 2 : baseSpeed;
+    if (autopilotActive && autopilotTarget) {
+        // Lock onto target smoothly
+        const targetPos = autopilotTarget.group.position;
+        const targetQuaternion = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(camera.position, targetPos, new THREE.Vector3(0, 1, 0))
+        );
+        camera.quaternion.slerp(targetQuaternion, 0.04); // Smooth transition
+        
+        // Synchronize targetRotation values to match the current camera quaternion
+        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+        targetRotationY = euler.y;
+        targetRotationX = euler.x;
+        mouseX = targetRotationY / (Math.PI * 0.3);
+        mouseY = targetRotationX / (Math.PI * 0.15);
+        
+        // Apply autopilot forward cruise speed
+        const apSpeed = baseSpeed * 1.2;
+        camera.translateZ(-apSpeed);
+        
+        // Proximity entry trigger
+        const distance = camera.position.distanceTo(targetPos);
+        if (distance < 25 && (Date.now() - lastWormholeExitTime > 3000)) {
+            const targetWH = autopilotTarget;
+            disableAutopilot();
+            enterWormhole(targetWH);
+        }
+    } else {
+        // Manual flight controls
+        if (steeringMode === 'free') {
+            // Steering is only active when mouse is within the central viewport (outside the cockpit panels)
+            const insideControlsZone = Math.abs(mouseX) < 0.72 && mouseY > -0.62;
+            
+            if (insideControlsZone) {
+                // Apply a small deadzone to prevent drift when centering mouse
+                const deadzone = 0.08;
+                let inputYaw = 0;
+                let inputPitch = 0;
 
-    // Movement
-    velocity.set(0, 0, 0);
+                if (Math.abs(mouseX) > deadzone) {
+                    inputYaw = (mouseX - Math.sign(mouseX) * deadzone) / (1 - deadzone);
+                }
+                if (Math.abs(mouseY) > deadzone) {
+                    inputPitch = (mouseY - Math.sign(mouseY) * deadzone) / (1 - deadzone);
+                }
 
-    if (moveForward) velocity.z -= moveSpeed;
-    if (moveBackward) velocity.z += moveSpeed;
-    if (moveLeft) velocity.x -= moveSpeed;
-    if (moveRight) velocity.x += moveSpeed;
-    if (moveUp) velocity.y += moveSpeed;
-    if (moveDown) velocity.y -= moveSpeed;
+                const yawSpeed = 0.025;
+                const pitchSpeed = 0.018;
 
-    // Apply movement in camera's local space
-    camera.translateX(velocity.x);
-    camera.translateY(velocity.y);
-    camera.translateZ(velocity.z);
+                targetRotationY -= inputYaw * yawSpeed;
+                targetRotationX += inputPitch * pitchSpeed;
+
+                const maxPitch = Math.PI * 0.45;
+                targetRotationX = Math.max(-maxPitch, Math.min(maxPitch, targetRotationX));
+            }
+        } else {
+            // Direct clamped look mode
+            targetRotationY = mouseX * Math.PI * 0.3;
+            targetRotationX = mouseY * Math.PI * 0.15;
+        }
+
+        camera.rotation.y = targetRotationY;
+        camera.rotation.x = targetRotationX;
+
+        // Apply barrel roll
+        if (barrelRoll !== 0) {
+            camera.rotation.z += barrelRoll * 0.05;
+            barrelRoll *= 0.95;
+            if (Math.abs(barrelRoll) < 0.01) barrelRoll = 0;
+        }
+
+        // Calculate speed
+        const moveSpeed = speedBoost ? baseSpeed * 2 : baseSpeed;
+
+        // Movement
+        velocity.set(0, 0, 0);
+
+        if (moveForward) velocity.z -= moveSpeed;
+        if (moveBackward) velocity.z += moveSpeed;
+        if (moveLeft) velocity.x -= moveSpeed;
+        if (moveRight) velocity.x += moveSpeed;
+        if (moveUp) velocity.y += moveSpeed;
+        if (moveDown) velocity.y -= moveSpeed;
+
+        // Apply movement in camera's local space
+        camera.translateX(velocity.x);
+        camera.translateY(velocity.y);
+        camera.translateZ(velocity.z);
+    }
+
+    // Explicitly update camera matrix so other computations use the current position/quaternion immediately
+    camera.updateMatrixWorld();
 
     // Update HUD
     updateHUD();
 }
 
 function checkWormholeProximity() {
+    if (Date.now() - lastWormholeExitTime < 3000) return; // 3-second cooldown after exiting!
+    
     wormholes.forEach(wormhole => {
         const distance = camera.position.distanceTo(wormhole.group.position);
 
@@ -1062,14 +1696,29 @@ function checkWormholeProximity() {
 
 function animateWormholes() {
     const time = Date.now() * 0.001;
+    let dt = time - lastWormholeUpdateTime;
+    if (dt > 0.1) dt = 0.1;
+    lastWormholeUpdateTime = time;
 
     wormholes.forEach((wormhole, wormholeIndex) => {
+        // Position and distance used for multiple visual effects
+        const wormholeWorldPos = new THREE.Vector3();
+        wormhole.group.getWorldPosition(wormholeWorldPos);
+        const distance = camera.position.distanceTo(wormholeWorldPos);
+
         // Overall gentle rotation
         wormhole.group.rotation.z += 0.002;
 
         // Gentle breathing scale
         const baseScale = 1 + Math.sin(time * 0.5 + wormholeIndex * Math.PI) * 0.03;
         wormhole.group.scale.set(baseScale, baseScale, baseScale);
+
+        // 1. Pulsating Event Horizon Core
+        const eventHorizon = wormhole.group.getObjectByName('eventHorizon');
+        if (eventHorizon) {
+            const pulse = 1.0 + Math.sin(time * 3 + wormholeIndex * Math.PI) * 0.05;
+            eventHorizon.scale.set(pulse, pulse, pulse);
+        }
 
         // Animate energy rings - rotate at different speeds
         const energyRings = wormhole.group.getObjectByName('energyRings');
@@ -1103,53 +1752,93 @@ function animateWormholes() {
             });
         }
 
-        // Animate particles - spiral motion
+        // 2. Turbulent Proximity Swirl
+        // Map distance: under 150 units, speed increases from 1x up to 4.0x at 25 units.
+        let speedMultiplier = 1.0;
+        if (distance < 150) {
+            const normDist = Math.max(0, Math.min(1, (150 - distance) / (150 - 25)));
+            speedMultiplier = 1.0 + normDist * 3.0; // 1.0x to 4.0x
+        }
+
+        if (wormhole.particleTime === undefined) {
+            wormhole.particleTime = time;
+        }
+        wormhole.particleTime += dt * speedMultiplier;
+
         const particlesGroup = wormhole.group.getObjectByName('particles');
         if (particlesGroup) {
             const particles = particlesGroup.getObjectByName('accretionParticles');
-            if (particles && particles.geometry) {
-                const positions = particles.geometry.attributes.position.array;
-                const opacities = particles.geometry.attributes.opacity ? particles.geometry.attributes.opacity.array : null;
-                const maxRadius = 35;
+            if (particles && particles.material && particles.material.uniforms) {
+                particles.material.uniforms.time.value = wormhole.particleTime;
+            }
+        }
 
-                for (let i = 0; i < positions.length / 3; i++) {
-                    const i3 = i * 3;
-                    const x = positions[i3];
-                    const y = positions[i3 + 1];
+        // 3. Dynamic Electro-Magnetic Arcs (Space Lightning)
+        const lightningGroup = wormhole.group.getObjectByName('lightning');
+        if (lightningGroup) {
+            const pointsPerLine = 10;
+            lightningGroup.children.forEach(line => {
+                if (line.userData.active) {
+                    // Decay opacity
+                    line.userData.opacity -= 0.08;
+                    if (line.userData.opacity <= 0) {
+                        line.userData.opacity = 0;
+                        line.userData.active = false;
+                    }
+                    if (line.material) {
+                        line.material.opacity = line.userData.opacity;
+                    }
+                } else {
+                    // Randomly trigger a bolt
+                    if (Math.random() < 0.015) {
+                        line.userData.active = true;
+                        line.userData.opacity = 0.8 + Math.random() * 0.2;
+                        
+                        // Determine start point on event horizon (radius 3.5)
+                        const startAngle = Math.random() * Math.PI * 2;
+                        const startX = Math.cos(startAngle) * 3.5;
+                        const startY = Math.sin(startAngle) * 3.5;
+                        const startZ = 0;
 
-                    // Calculate current angle and radius
-                    let angle = Math.atan2(y, x);
-                    let radius = Math.sqrt(x * x + y * y);
+                        // Determine end point on outer rings (radius 7 to 12)
+                        const endAngle = Math.random() * Math.PI * 2;
+                        const outerRadius = 7 + Math.random() * 5;
+                        const endX = Math.cos(endAngle) * outerRadius;
+                        const endY = Math.sin(endAngle) * outerRadius;
+                        const endZ = (Math.random() - 0.5) * 2;
 
-                    // Rotate particles (spiral effect)
-                    angle += 0.01;
+                        const posAttr = line.geometry.getAttribute('position');
+                        const positions = posAttr.array;
 
-                    // Slowly pull toward center
-                    radius -= 0.02;
+                        for (let j = 0; j < pointsPerLine; j++) {
+                            const t = j / (pointsPerLine - 1);
+                            const baseX = startX + (endX - startX) * t;
+                            const baseY = startY + (endY - startY) * t;
+                            const baseZ = startZ + (endZ - startZ) * t;
 
-                    // Reset if too close to center
-                    if (radius < 8) {
-                        radius = Math.sqrt(Math.random()) * maxRadius;
-                        angle = Math.random() * Math.PI * 2;
+                            let dx = 0, dy = 0, dz = 0;
+                            if (j > 0 && j < pointsPerLine - 1) {
+                                const factor = Math.sin(t * Math.PI) * 1.5;
+                                dx = (Math.random() - 0.5) * factor;
+                                dy = (Math.random() - 0.5) * factor;
+                                dz = (Math.random() - 0.5) * factor;
+                            }
 
-                        // Recalculate opacity for new position
-                        if (opacities) {
-                            const distanceFromCenter = radius / maxRadius;
-                            const falloff = Math.pow(1 - distanceFromCenter, 2);
-                            opacities[i] = falloff * (0.7 + Math.random() * 0.3);
+                            positions[j * 3]     = baseX + dx;
+                            positions[j * 3 + 1] = baseY + dy;
+                            positions[j * 3 + 2] = baseZ + dz;
+                        }
+                        posAttr.needsUpdate = true;
+                        if (line.material) {
+                            line.material.opacity = line.userData.opacity;
+                        }
+                    } else {
+                        if (line.material) {
+                            line.material.opacity = 0;
                         }
                     }
-
-                    // Update positions
-                    positions[i3] = Math.cos(angle) * radius;
-                    positions[i3 + 1] = Math.sin(angle) * radius;
                 }
-
-                particles.geometry.attributes.position.needsUpdate = true;
-                if (opacities) {
-                    particles.geometry.attributes.opacity.needsUpdate = true;
-                }
-            }
+            });
         }
 
         // Animate spacetime grid - fixed opacity to prevent blinking
@@ -1172,9 +1861,6 @@ function animateWormholes() {
             lensFlare.rotation.z += 0.002;
 
             // Calculate angle between camera and wormhole
-            const wormholeWorldPos = new THREE.Vector3();
-            wormhole.group.getWorldPosition(wormholeWorldPos);
-
             const directionToWormhole = new THREE.Vector3();
             directionToWormhole.subVectors(wormholeWorldPos, camera.position).normalize();
 
@@ -1185,7 +1871,6 @@ function animateWormholes() {
             const alignment = cameraDirection.dot(directionToWormhole);
 
             // Distance-based scaling
-            const distance = camera.position.distanceTo(wormholeWorldPos);
             const distanceFactor = Math.max(0, 1 - distance / 150);
 
             // Adjust opacity based on viewing angle and distance
@@ -1271,20 +1956,23 @@ function startFlight() {
     currentScene = SCENES.OPEN_SPACE;
 
     document.getElementById('entry-screen').classList.remove('active');
+    
+    // Remove the UI class that disables key events
+    document.body.classList.remove('cockpit-view');
 
-    // Create wormholes in the distance
-    setTimeout(() => {
-        createWormholes();
-        createNebula();
-        isTransitioning = false;
-    }, 1000);
+    createWormholes();
+    createNebula();
+    createSpaceCrystals();
+    createWarpLines();
+    isTransitioning = false;
+    showCockpitBezel();
 }
 
 function enterWormhole(wormhole) {
     if (isTransitioning) return;
     isTransitioning = true;
     currentScene = SCENES.WORMHOLE_TRAVEL;
-
+    hideCockpitBezel();
     // Stop all movement
     moveForward = false;
     moveBackward = false;
@@ -1306,6 +1994,8 @@ function enterWormhole(wormhole) {
 
     // Align camera to look straight ahead down the tunnel
     camera.rotation.set(0, 0, 0);
+    targetRotationY = 0;
+    targetRotationX = 0;
 
     // Create tunnel
     createWormholeTunnel(color);
@@ -1314,6 +2004,459 @@ function enterWormhole(wormhole) {
     setTimeout(() => {
         window.location.href = destination;
     }, 3500);
+}
+
+// ========================================
+// Autopilot Navigation System
+// ========================================
+
+function initAutopilotUI() {
+    const select = document.getElementById('ap-dest-select');
+    if (!select) return;
+    
+    // Clear current options beyond the first placeholder
+    select.innerHTML = '<option value="">SELECT DEST</option>';
+    
+    WORMHOLE_CONFIG.forEach(config => {
+        const opt = document.createElement('option');
+        opt.value = config.id;
+        opt.textContent = config.label.toUpperCase();
+        select.appendChild(opt);
+    });
+    
+    const toggleBtn = document.getElementById('ap-toggle-btn');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleAutopilot);
+    }
+    
+    select.addEventListener('change', (e) => {
+        const destId = e.target.value;
+        if (destId) {
+            const targetWH = wormholes.find(w => w.type === destId);
+            if (targetWH) {
+                setAutopilotTarget(targetWH);
+                if (!autopilotActive) {
+                    enableAutopilot();
+                    showNavAlert('AUTOPILOT ENGAGED', `NAVIGATING TO ${targetWH.config.label.toUpperCase()}`);
+                } else {
+                    showNavAlert('NAV COORDINATES UPDATED', `NEW TARGET: ${targetWH.config.label.toUpperCase()}`);
+                }
+            }
+        } else {
+            autopilotTarget = null;
+            disableAutopilot();
+            showNavAlert('AUTOPILOT DISENGAGED', 'MANUAL FLIGHT ACTIVE');
+        }
+    });
+}
+
+function setAutopilotTarget(wormhole) {
+    autopilotTarget = wormhole;
+    // Sync the select dropdown visual value
+    const select = document.getElementById('ap-dest-select');
+    if (select && select.value !== wormhole.type) {
+        select.value = wormhole.type;
+    }
+}
+
+function toggleAutopilot() {
+    if (!autopilotTarget) {
+        // Find closest wormhole if none selected, excluding the one we just exited (within 35 units)
+        if (wormholes.length > 0) {
+            let closest = null;
+            let minDist = Infinity;
+            wormholes.forEach(w => {
+                const dist = camera.position.distanceTo(w.group.position);
+                if (dist > 35 && dist < minDist) {
+                    minDist = dist;
+                    closest = w;
+                }
+            });
+
+            // Fallback if all are within 35 units (unlikely)
+            if (!closest) {
+                closest = wormholes[0];
+                let d = camera.position.distanceTo(closest.group.position);
+                for (let i = 1; i < wormholes.length; i++) {
+                    const dist = camera.position.distanceTo(wormholes[i].group.position);
+                    if (dist < d) {
+                        d = dist;
+                        closest = wormholes[i];
+                    }
+                }
+            }
+            setAutopilotTarget(closest);
+        } else {
+            showNavAlert('NO TARGET FOUND', 'WORMHOLES OFFLINE');
+            return;
+        }
+    }
+    
+    if (autopilotActive) {
+        disableAutopilot();
+        showNavAlert('AUTOPILOT DISENGAGED', 'MANUAL FLIGHT ACTIVE');
+    } else {
+        enableAutopilot();
+        showNavAlert('AUTOPILOT ENGAGED', `NAVIGATING TO ${autopilotTarget.config.label.toUpperCase()}`);
+    }
+}
+
+function enableAutopilot() {
+    autopilotActive = true;
+    
+    // Reset manual flight input flags to prevent immediate auto-disengage
+    moveForward = false;
+    moveBackward = false;
+    moveLeft = false;
+    moveRight = false;
+    moveUp = false;
+    moveDown = false;
+    barrelRoll = 0;
+
+    // Clear cockpit dashboard keys from staying lit up
+    if (typeof COCKPIT_KEY_MAP !== 'undefined') {
+        Object.values(COCKPIT_KEY_MAP).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('pressed');
+        });
+    }
+
+    const toggleBtn = document.getElementById('ap-toggle-btn');
+    const statusText = document.getElementById('ap-status');
+    if (toggleBtn) {
+        toggleBtn.textContent = 'DISENGAGE AP';
+        toggleBtn.classList.add('active');
+    }
+    if (statusText) {
+        statusText.textContent = 'ENGAGED';
+        statusText.classList.add('ap-active');
+    }
+    
+    // Vocal announcement
+    speakCoPilot("Autopilot engaged. Course locked.");
+}
+
+function disableAutopilot() {
+    autopilotActive = false;
+    const toggleBtn = document.getElementById('ap-toggle-btn');
+    const statusText = document.getElementById('ap-status');
+    const select = document.getElementById('ap-dest-select');
+    if (toggleBtn) {
+        toggleBtn.textContent = 'ENGAGE AP';
+        toggleBtn.classList.remove('active');
+    }
+    if (statusText) {
+        statusText.textContent = 'OFFLINE';
+        statusText.classList.remove('ap-active');
+    }
+    if (select) {
+        select.value = autopilotTarget ? autopilotTarget.type : '';
+    }
+    
+    // Vocal announcement
+    speakCoPilot("Manual control override.");
+}
+
+function showNavAlert(title, subtitle, duration = 3000) {
+    const el = document.getElementById('deep-space-warning');
+    if (!el) return;
+    
+    const originalText = "WARNING: DEEP SPACE DETECTED";
+    const originalSub = "Return to navigation zone";
+    
+    const textEl = el.querySelector('.warning-text');
+    const subEl = el.querySelector('.warning-subtext');
+    const iconEl = el.querySelector('.warning-icon');
+    
+    if (textEl) textEl.textContent = title;
+    if (subEl) subEl.textContent = subtitle;
+    if (iconEl) iconEl.textContent = "⚙️";
+    
+    el.classList.remove('hidden');
+    
+    // Clear deep space mode class to keep the screen warning looking clean
+    const hud = document.getElementById('hud');
+    if (hud) hud.classList.remove('deep-space-mode');
+    
+    if (window.navAlertTimeout) clearTimeout(window.navAlertTimeout);
+    
+    window.navAlertTimeout = setTimeout(() => {
+        el.classList.add('hidden');
+        if (textEl) textEl.textContent = originalText;
+        if (subEl) subEl.textContent = originalSub;
+        if (iconEl) iconEl.textContent = "⚠️";
+    }, duration);
+}
+
+// ========================================
+// AI Interactive Console Logic
+// ========================================
+
+function initConsole() {
+    const inputLeft = document.getElementById('ap-console-input');
+    const inputBottom = document.getElementById('ap-console-input-bottom');
+    const output = document.getElementById('ap-console-out');
+    if (!output) return;
+    
+    // Left input setup
+    if (inputLeft) {
+        inputLeft.addEventListener('focus', () => {
+            isConsoleTyping = true;
+        });
+        inputLeft.addEventListener('blur', () => {
+            isConsoleTyping = false;
+        });
+        inputLeft.addEventListener('keydown', () => {
+            playClickSound();
+        });
+        inputLeft.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                const rawVal = inputLeft.value;
+                const cleanVal = rawVal.trim().toLowerCase();
+                inputLeft.value = '';
+                if (inputBottom) inputBottom.value = '';
+                
+                if (cleanVal.length === 0) return;
+                
+                writeToConsole(`> ${rawVal}`);
+                executeConsoleCommand(cleanVal);
+            }
+        });
+    }
+
+    // Bottom input setup
+    if (inputBottom) {
+        inputBottom.addEventListener('focus', () => {
+            isConsoleTyping = true;
+        });
+        inputBottom.addEventListener('blur', () => {
+            isConsoleTyping = false;
+        });
+        inputBottom.addEventListener('keydown', () => {
+            playClickSound();
+        });
+        inputBottom.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                const rawVal = inputBottom.value;
+                const cleanVal = rawVal.trim().toLowerCase();
+                inputBottom.value = '';
+                if (inputLeft) inputLeft.value = '';
+                
+                if (cleanVal.length === 0) return;
+                
+                writeToConsole(`> ${rawVal}`);
+                executeConsoleCommand(cleanVal);
+            }
+        });
+    }
+}
+
+function writeToConsole(text) {
+    const output = document.getElementById('ap-console-out');
+    if (!output) return;
+    
+    const div = document.createElement('div');
+    div.style.marginBottom = '6px';
+    div.style.fontFamily = "'Courier New', Courier, monospace";
+    output.appendChild(div);
+    
+    let charIdx = 0;
+    function typeChar() {
+        if (charIdx < text.length) {
+            div.textContent += text.charAt(charIdx);
+            charIdx++;
+            output.scrollTop = output.scrollHeight;
+            playClickSound();
+            setTimeout(typeChar, 10);
+        }
+    }
+    
+    typeChar();
+}
+
+function executeConsoleCommand(command) {
+    const parts = command.split(' ');
+    const cmd = parts[0];
+    const arg = parts.slice(1).join(' ');
+    
+    switch (cmd) {
+        case 'help':
+            writeToConsole("COMMANDS LOG:\n- help: show options\n- scan: range to targets\n- systems: diagnostic checks\n- ap [dest]: engage autopilot\n- ap off: disengage autopilot\n- warp: toggle speed streaks\n- sound: toggle audio feedback\n- steer: toggle steering mode (FREE / CONE)\n- shunt [engines|shields|systems]: route power\n- vent: flush coolant systems");
+            break;
+            
+        case 'scan':
+            if (wormholes.length > 0) {
+                let nearest = null;
+                let minDist = Infinity;
+                wormholes.forEach(w => {
+                    const d = camera.position.distanceTo(w.group.position);
+                    if (d < minDist) { minDist = d; nearest = w; }
+                });
+                if (nearest) {
+                    writeToConsole(`LOCK TARGET: ${nearest.config.label.toUpperCase()}\nDISTANCE: ${(minDist * 0.001).toFixed(4)} LY`);
+                }
+            } else {
+                writeToConsole("SCAN FAILED: OBJECTS OFFLINE.");
+            }
+            break;
+            
+        case 'systems':
+            writeToConsole("SHIP SYSTEMS REPORT:\n- HULL HULL CAP: NOMINAL\n- SENSORS SCAN: ONLINE\n- THRUST ENGINES: READY\n- HYPERDRIVE FLUID: ONLINE\n- COMP NAV: OPERATIONAL");
+            break;
+            
+        case 'ap':
+        case 'autopilot':
+            if (arg === 'off' || arg === 'cancel') {
+                if (autopilotActive) {
+                    disableAutopilot();
+                    writeToConsole("AUTOPILOT TERMINATED. MANUAL LOCK ACTIVE.");
+                } else {
+                    writeToConsole("AUTOPILOT MODULE IS ALREADY OFFLINE.");
+                }
+            } else if (arg) {
+                const targetWH = wormholes.find(w => w.type === arg || w.config.label.toLowerCase().includes(arg));
+                if (targetWH) {
+                    setAutopilotTarget(targetWH);
+                    enableAutopilot();
+                    writeToConsole(`COURSE COMPUTED. LOCK TARGET: ${targetWH.config.label.toUpperCase()}.\nTHRUST ENGAGED.`);
+                    showNavAlert('AUTOPILOT ACTIVE', `NAVIGATING TO ${targetWH.config.label.toUpperCase()}`);
+                } else {
+                    writeToConsole(`TARGET NOT RESOLVED: "${arg}"`);
+                }
+            } else {
+                writeToConsole("ERROR: TARGET REQUIRED (e.g. ap work)");
+            }
+            break;
+            
+        case 'warp':
+            warpActive = !warpActive;
+            writeToConsole(warpActive ? "HYPERDRIVE ACTIVE. STREAKS INITIALIZED." : "WARP DEACTIVATED. RETURN TO COGNITIVE SPACE.");
+            break;
+
+        case 'sound':
+        case 'audio':
+            toggleSound();
+            break;
+            
+        case 'steer':
+        case 'steering':
+            toggleSteeringMode();
+            break;
+            
+        case 'shunt':
+            if (arg === 'engines' || arg === 'engine') {
+                shuntPower('engines');
+            } else if (arg === 'shields' || arg === 'shield') {
+                shuntPower('shields');
+            } else if (arg === 'systems' || arg === 'system' || arg === 'normal') {
+                shuntPower('systems');
+            } else {
+                writeToConsole("ERROR: SHUNT TARGET REQUIRED (e.g. shunt engines, shunt shields, shunt systems)");
+            }
+            break;
+
+        case 'vent':
+        case 'purge':
+            const coolantEl = document.getElementById('cp-coolant-val');
+            if (coolantEl && (coolantEl.textContent === 'HIGH TEMP' || coolantEl.textContent === 'LEAK DETECTED' || supernovaActive)) {
+                coolantEl.textContent = 'NOMINAL';
+                coolantEl.className = 'pv ok';
+                writeToConsole("SYSTEM DIAGNOSTIC: AUXILIARY COOLANT FLUSHED. RE-ESTABLISHING THERMAL STEADY STATE.");
+                speakCoPilot("Coolant systems flushed. Thermal loop stable.");
+                if (supernovaActive) {
+                    supernovaTime = 0; // stop flare early on vent
+                }
+            } else {
+                writeToConsole("SYSTEM REPORT: COOLANT SYSTEMS ALREADY STABILIZED.");
+            }
+            break;
+            
+        default:
+            writeToConsole(`UNKNOWN COMMAND: "${cmd}". TYPE "help" FOR LIST.`);
+            break;
+    }
+}
+
+// ========================================
+// Tactical Navigation Radar Drawing
+// ========================================
+
+function updateRadar() {
+    const canvas = document.getElementById('radar-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    
+    ctx.clearRect(0, 0, w, h);
+    
+    // Draw radar circles
+    ctx.strokeStyle = 'rgba(0, 255, 136, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cx * 0.4, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cx * 0.8, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Draw axis lines
+    ctx.beginPath();
+    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    ctx.stroke();
+    
+    // Draw sweep lines
+    const sweepAngle = (Date.now() * 0.0022) % (Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0, 255, 136, 0.26)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(sweepAngle) * cx, cy + Math.sin(sweepAngle) * cy);
+    ctx.stroke();
+    
+    // Sweep glow background
+    ctx.fillStyle = 'rgba(0, 255, 136, 0.02)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, cx, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Central ship blip
+    ctx.fillStyle = (Date.now() % 1000 > 500) ? '#ffffff' : '#00ff88';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw coordinate target blips
+    const maxRange = 300;
+    wormholes.forEach(wh => {
+        const localPos = new THREE.Vector3().subVectors(wh.group.position, camera.position);
+        localPos.applyQuaternion(camera.quaternion.clone().invert());
+        
+        const dist = localPos.length();
+        if (dist < maxRange) {
+            // Project X -> X and Z -> Y (since -Z is forward in WebGL space)
+            const bx = cx + (localPos.x / maxRange) * (cx * 0.85);
+            const by = cy + (localPos.z / maxRange) * (cy * 0.85);
+            
+            const colorHex = wh.color;
+            const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+            
+            ctx.shadowColor = colorStr;
+            ctx.shadowBlur = 5;
+            ctx.fillStyle = colorStr;
+            ctx.beginPath();
+            ctx.arc(bx, by, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0; // reset
+            
+            // Draw Target text tag
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.font = '5px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(wh.config.label.toUpperCase().substring(0, 4), bx, by - 5);
+        }
+    });
 }
 
 // ========================================
@@ -1330,6 +2473,44 @@ function setupEventListeners() {
     if (typeof initMobileControls === 'function') {
         initMobileControls();
     }
+
+    // Initialize autopilot UI controls
+    initAutopilotUI();
+
+    // Initialize interactive console controls
+    initConsole();
+
+    // Initialize cockpit view toggle button
+    initCockpitToggle();
+
+    // Initialize interactive sound toggle listener
+    const soundToggle = document.getElementById('cp-sound-val');
+    if (soundToggle) {
+        soundToggle.addEventListener('click', () => {
+            toggleSound();
+        });
+    }
+
+    // Initialize interactive steering mode toggle listener
+    const steerToggle = document.getElementById('cp-steer-val');
+    if (steerToggle) {
+        steerToggle.addEventListener('click', () => {
+            toggleSteeringMode();
+        });
+    }
+
+    // Click on canvas or background viewport to fire mining laser
+    window.addEventListener('click', (event) => {
+        if (currentScene !== SCENES.OPEN_SPACE || isConsoleTyping) return;
+        
+        // Block firing when clicking on interactive cockpit buttons/inputs/panels
+        const target = event.target;
+        if (target.closest('.cockpit-panel') || target.closest('.cockpit-bottom') || target.closest('.hud-toggle-btn') || target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'BUTTON') {
+            return;
+        }
+        
+        fireMiningLaser();
+    });
 }
 
 function onWindowResize() {
@@ -1343,13 +2524,28 @@ function onMouseMove(event) {
     mouseX = (event.clientX / window.innerWidth) * 2 - 1;
     mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // Update rotation targets
-    targetRotationY = mouseX * Math.PI * 0.3;
-    targetRotationX = mouseY * Math.PI * 0.15;
+    // Update rotation targets only if in direct cone mode
+    if (steeringMode === 'cone') {
+        targetRotationY = mouseX * Math.PI * 0.3;
+        targetRotationX = mouseY * Math.PI * 0.15;
+    }
 }
 
 function onKeyDown(event) {
+    if (isConsoleTyping) return;
     const key = event.key.toLowerCase();
+
+    // Toggle Cockpit View
+    if (key === 'c' && currentScene === SCENES.OPEN_SPACE) {
+        toggleCockpitView();
+        return;
+    }
+
+    // Toggle Steering Mode
+    if (key === 'm' && currentScene === SCENES.OPEN_SPACE) {
+        toggleSteeringMode();
+        return;
+    }
 
     // Start flight from cockpit
     if ((key === 'w' || key === 'arrowup') && currentScene === SCENES.COCKPIT) {
@@ -1393,10 +2589,15 @@ function onKeyDown(event) {
             speedBoost = true;
             moveDown = true;
         }
+
+        // Light up the matching cockpit key indicator
+        setCockpitKey(key, true);
+        if (event.shiftKey) setCockpitKey('shift', true);
     }
 }
 
 function onKeyUp(event) {
+    if (isConsoleTyping) return;
     const key = event.key.toLowerCase();
 
     switch (key) {
@@ -1426,6 +2627,629 @@ function onKeyUp(event) {
         speedBoost = false;
         moveDown = false;
     }
+
+    // Extinguish the cockpit key indicator
+    setCockpitKey(key, false);
+    if (!event.shiftKey) setCockpitKey('shift', false);
+}
+
+// ========================================
+// Cockpit Bezel — Show / Hide / Key Sync
+// ========================================
+
+// Maps a lowercased event.key to the corresponding cockpit indicator element ID.
+const COCKPIT_KEY_MAP = {
+    'w':         'ck-w',     'arrowup':    'ck-w',
+    's':         'ck-s',     'arrowdown':  'ck-s',
+    'a':         'ck-a',     'arrowleft':  'ck-a',
+    'd':         'ck-d',     'arrowright': 'ck-d',
+    ' ':         'ck-space',
+    'q':         'ck-q',
+    'e':         'ck-e',
+    'shift':     'ck-shift'
+};
+
+/**
+ * Toggles the `.pressed` state on a cockpit key cap.
+ * @param {string} key - event.key.toLowerCase()
+ * @param {boolean} active - true = light up, false = dim
+ */
+function setCockpitKey(key, active) {
+    const id = COCKPIT_KEY_MAP[key];
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('pressed', active);
+}
+
+function showCockpitBezel() {
+    if (!cockpitVisible) return;
+    const bezel = document.getElementById('cockpit-bezel');
+    if (bezel) bezel.classList.remove('hidden');
+    document.body.classList.add('cockpit-bezel-active');
+}
+
+function hideCockpitBezel() {
+    const bezel = document.getElementById('cockpit-bezel');
+    if (bezel) bezel.classList.add('hidden');
+    document.body.classList.remove('cockpit-bezel-active');
+    // Clear all pressed key states so nothing gets stuck highlighted
+    Object.values(COCKPIT_KEY_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('pressed');
+    });
+}
+
+function initCockpitToggle() {
+    const btn = document.getElementById('cockpit-toggle-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            toggleCockpitView();
+        });
+    }
+}
+
+function toggleCockpitView() {
+    cockpitVisible = !cockpitVisible;
+    const bezel = document.getElementById('cockpit-bezel');
+    const btn = document.getElementById('cockpit-toggle-btn');
+    
+    if (cockpitVisible) {
+        if (bezel) {
+            bezel.classList.remove('hidden');
+            document.body.classList.add('cockpit-bezel-active');
+        }
+        if (btn) {
+            btn.classList.remove('minimized');
+            const txt = btn.querySelector('.toggle-text');
+            if (txt) txt.textContent = "COCKPIT VIEW";
+        }
+        writeToConsole("SYSTEM STATUS: COCKPIT VIEW ENGAGED.");
+    } else {
+        if (bezel) {
+            bezel.classList.add('hidden');
+            document.body.classList.remove('cockpit-bezel-active');
+        }
+        if (btn) {
+            btn.classList.add('minimized');
+            const txt = btn.querySelector('.toggle-text');
+            if (txt) txt.textContent = "NIGHT SKY VIEW";
+        }
+        writeToConsole("SYSTEM STATUS: WIDE ANGLE SKY VIEW ENGAGED.");
+    }
+    speakCoPilot("View mode updated.");
+}
+
+// ========================================
+// Web Audio Synthesizer & AI Co-Pilot
+// ========================================
+
+function initAudioSynth() {
+    if (audioCtx) return;
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        
+        // --- 1. Engine Hum Synth ---
+        engineOsc = audioCtx.createOscillator();
+        engineFilter = audioCtx.createBiquadFilter();
+        engineGain = audioCtx.createGain();
+        
+        engineOsc.type = 'sawtooth';
+        engineOsc.frequency.setValueAtTime(45, audioCtx.currentTime); // low sub frequency
+        
+        engineFilter.type = 'lowpass';
+        engineFilter.frequency.setValueAtTime(120, audioCtx.currentTime); // cut harsh harmonics
+        
+        engineGain.gain.setValueAtTime(0, audioCtx.currentTime); // start silent
+        
+        engineOsc.connect(engineFilter);
+        engineFilter.connect(engineGain);
+        engineGain.connect(audioCtx.destination);
+        engineOsc.start();
+        
+        // --- 2. Warp Spool-up & Flight Noise ---
+        warpOsc = audioCtx.createOscillator();
+        warpOsc.type = 'triangle';
+        warpOsc.frequency.setValueAtTime(80, audioCtx.currentTime);
+        
+        warpGainNode = audioCtx.createGain();
+        warpGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        
+        // White noise generator for warp wind slipstream
+        const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+        
+        warpNoiseNode = audioCtx.createBufferSource();
+        warpNoiseNode.buffer = noiseBuffer;
+        warpNoiseNode.loop = true;
+        
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(350, audioCtx.currentTime);
+        noiseFilter.Q.setValueAtTime(3.0, audioCtx.currentTime);
+        
+        warpNoiseGain = audioCtx.createGain();
+        warpNoiseGain.gain.setValueAtTime(0, audioCtx.currentTime); // start silent
+        
+        warpOsc.connect(warpGainNode);
+        warpNoiseNode.connect(noiseFilter);
+        noiseFilter.connect(warpNoiseGain);
+        
+        warpGainNode.connect(audioCtx.destination);
+        warpNoiseGain.connect(audioCtx.destination);
+        
+        warpOsc.start();
+        warpNoiseNode.start();
+    } catch (e) {
+        console.error("Failed to initialize AudioContext:", e);
+    }
+}
+
+function toggleSound(forcedState) {
+    soundEnabled = forcedState !== undefined ? forcedState : !soundEnabled;
+    const soundToggle = document.getElementById('cp-sound-val');
+    
+    if (soundEnabled) {
+        // Initialize if not already initialized
+        if (!audioCtx) {
+            initAudioSynth();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        
+        if (soundToggle) {
+            soundToggle.textContent = 'ON';
+            soundToggle.className = 'pv ok';
+        }
+        
+        // Start engine hum at low base volume
+        if (engineGain) {
+            engineGain.gain.setTargetAtTime(0.12, audioCtx.currentTime, 0.1);
+        }
+        
+        writeToConsole("AUDIO SUBSYSTEMS: INITIALIZED & ONLINE.");
+        speakCoPilot("Audio systems online. Co-pilot initialized.");
+    } else {
+        if (soundToggle) {
+            soundToggle.textContent = 'OFF';
+            soundToggle.className = 'pv alert';
+        }
+        // Fade out engine hum
+        if (engineGain) {
+            engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+        // Fade out warp sound
+        if (warpGainNode) {
+            warpGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+        if (warpNoiseGain) {
+            warpNoiseGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+        writeToConsole("AUDIO SUBSYSTEMS: OFFLINE.");
+        
+        // Cancel speech synthesis
+        window.speechSynthesis.cancel();
+    }
+}
+
+function toggleSteeringMode(forcedState) {
+    if (forcedState !== undefined) {
+        steeringMode = forcedState;
+    } else {
+        steeringMode = steeringMode === 'free' ? 'cone' : 'free';
+    }
+    
+    // Play tactical sound confirmation
+    playLockChirp();
+    
+    const steerToggle = document.getElementById('cp-steer-val');
+    
+    if (steeringMode === 'free') {
+        if (steerToggle) {
+            steerToggle.textContent = 'FREE';
+            steerToggle.className = 'pv ok';
+        }
+        writeToConsole("STEERING INTERFACE: FREE-FLIGHT MODE (360° MOTION).");
+        speakCoPilot("Free flight steering online. 360-degree control active.");
+    } else {
+        if (steerToggle) {
+            steerToggle.textContent = 'CONE';
+            steerToggle.className = 'pv alert';
+        }
+        
+        // Clamp current camera orientation to direct cone limits
+        const maxY = Math.PI * 0.3;
+        const maxX = Math.PI * 0.15;
+        targetRotationY = Math.max(-maxY, Math.min(maxY, targetRotationY));
+        targetRotationX = Math.max(-maxX, Math.min(maxX, targetRotationX));
+        camera.rotation.y = targetRotationY;
+        camera.rotation.x = targetRotationX;
+        
+        writeToConsole("STEERING INTERFACE: CLAMPED DIRECT-VIEW CONE.");
+        speakCoPilot("Direct view steering online. Clamped cone limit active.");
+    }
+}
+
+function speakCoPilot(text) {
+    if (!soundEnabled) return;
+    try {
+        // Cancel currently speaking messages to prevent queue overlap
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.08; // slightly faster
+        utterance.pitch = 0.95; // slightly deeper / robotic
+        
+        // Find a suitable voice if available (optional, defaults to browser default)
+        const voices = window.speechSynthesis.getVoices();
+        const roboticVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Google') || v.name.includes('Robotic') || v.name.includes('Zira')));
+        if (roboticVoice) {
+            utterance.voice = roboticVoice;
+        }
+        
+        window.speechSynthesis.speak(utterance);
+    } catch (e) {
+        console.error("Co-pilot voice error:", e);
+    }
+}
+
+function playClickSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400, audioCtx.currentTime); // high pitch tick
+        
+        gain.gain.setValueAtTime(0.008, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.025); // very short tick
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.03);
+    } catch (e) {}
+}
+
+function playExplosionSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        // Low pitch blast sweep
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.6);
+        
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+        
+        // White noise explosion blast
+        const noise = audioCtx.createBufferSource();
+        const noiseFilter = audioCtx.createBiquadFilter();
+        const noiseGain = audioCtx.createGain();
+        
+        const bufferSize = audioCtx.sampleRate * 0.7; // 0.7 second blast
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        
+        noise.buffer = noiseBuffer;
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(250, audioCtx.currentTime);
+        noiseFilter.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+        
+        noiseGain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.65);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.65);
+        noise.start();
+        noise.stop(audioCtx.currentTime + 0.7);
+    } catch (e) {}
+}
+
+function playWarpSpoolSound(isActive) {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        if (isActive) {
+            // Sweep frequency up
+            if (warpGainNode) {
+                warpGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+                warpGainNode.gain.setValueAtTime(warpGainNode.gain.value, audioCtx.currentTime);
+                warpGainNode.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 1.5);
+            }
+            if (warpOsc) {
+                warpOsc.frequency.cancelScheduledValues(audioCtx.currentTime);
+                warpOsc.frequency.setValueAtTime(80, audioCtx.currentTime);
+                warpOsc.frequency.exponentialRampToValueAtTime(950, audioCtx.currentTime + 2.2);
+            }
+            if (warpNoiseGain) {
+                warpNoiseGain.gain.cancelScheduledValues(audioCtx.currentTime);
+                warpNoiseGain.gain.setValueAtTime(warpNoiseGain.gain.value, audioCtx.currentTime);
+                warpNoiseGain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 1.5);
+            }
+        } else {
+            // Fade warp sound down
+            if (warpGainNode) {
+                warpGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+                warpGainNode.gain.setValueAtTime(warpGainNode.gain.value, audioCtx.currentTime);
+                warpGainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+            }
+            if (warpNoiseGain) {
+                warpNoiseGain.gain.cancelScheduledValues(audioCtx.currentTime);
+                warpNoiseGain.gain.setValueAtTime(warpNoiseGain.gain.value, audioCtx.currentTime);
+                warpNoiseGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+            }
+        }
+    } catch (e) {}
+}
+
+// --- Interactive Shunting Logic ---
+function shuntPower(mode) {
+    powerMode = mode;
+    const reactorVal = document.getElementById('cp-reactor-val');
+    const reactorBar = document.getElementById('cp-reactor-bar');
+    const coolantVal = document.getElementById('cp-coolant-val');
+    
+    if (mode === 'engines') {
+        baseSpeed = 0.6; // double speed
+        
+        if (reactorVal) {
+            reactorVal.textContent = '125.0%';
+            reactorVal.className = 'pv warn';
+        }
+        if (reactorBar) {
+            reactorBar.style.width = '100%';
+            reactorBar.style.backgroundColor = '#ffaa00';
+            reactorBar.style.boxShadow = '0 0 6px rgba(255, 170, 0, 0.7)';
+        }
+        if (coolantVal) {
+            coolantVal.textContent = 'HIGH TEMP';
+            coolantVal.className = 'pv warn';
+        }
+        
+        writeToConsole("REACTOR PATHWAY: DIVERTER SHUNTED TO PROPULSION VECTOR. REACTOR OVERLOAD DETECTED.");
+        speakCoPilot("Engines shunted. Shield grid offline. Coolant temperature rising.");
+    } else if (mode === 'shields') {
+        baseSpeed = 0.15; // half speed
+        
+        if (reactorVal) {
+            reactorVal.textContent = '85.0%';
+            reactorVal.className = 'pv ok';
+        }
+        if (reactorBar) {
+            reactorBar.style.width = '85%';
+            reactorBar.style.backgroundColor = '#00ff88';
+            reactorBar.style.boxShadow = '0 0 6px rgba(0, 255, 136, 0.7)';
+        }
+        if (coolantVal) {
+            coolantVal.textContent = 'NOMINAL';
+            coolantVal.className = 'pv ok';
+        }
+        
+        writeToConsole("REACTOR PATHWAY: DIVERTER SHUNTED TO SHIELD AMPLIFIERS. PROPULSION OUTPUT THROTTLED.");
+        speakCoPilot("Deflector grid shunted. Engines output restricted.");
+    } else { // balanced 'systems'
+        baseSpeed = 0.3; // standard speed
+        
+        if (reactorVal) {
+            reactorVal.textContent = '98.4%';
+            reactorVal.className = 'pv ok';
+        }
+        if (reactorBar) {
+            reactorBar.style.width = '98.4%';
+            reactorBar.style.backgroundColor = '#00ff88';
+            reactorBar.style.boxShadow = '0 0 6px rgba(0, 255, 136, 0.7)';
+        }
+        if (coolantVal) {
+            coolantVal.textContent = 'NOMINAL';
+            coolantVal.className = 'pv ok';
+        }
+        
+        writeToConsole("REACTOR PATHWAY: CONDUIT DIVERTERS BALANCED. ALL SYSTEMS INTEGRATED.");
+        speakCoPilot("Grid power levels balanced.");
+    }
+}
+
+// --- Active Defence Weapon System (Laser) ---
+function fireMiningLaser() {
+    // Play laser sound
+    playLaserSound();
+    
+    // Laser start point (ship nose in camera space)
+    const start = new THREE.Vector3(0, -0.8, -1.5).applyMatrix4(camera.matrixWorld);
+    
+    // Raycaster to check intersection with space crystals
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const intersects = raycaster.intersectObjects(spaceCrystals);
+    
+    let end = new THREE.Vector3();
+    let hitCrystal = null;
+    
+    if (intersects.length > 0 && intersects[0].distance < 160) {
+        end.copy(intersects[0].point);
+        hitCrystal = intersects[0].object;
+    } else {
+        // endpoint is 160 units forward
+        end.set(0, 0, -160).applyMatrix4(camera.matrixWorld);
+    }
+    
+    // Draw 3D laser cylinder
+    const distance = start.distanceTo(end);
+    const laserGeo = new THREE.CylinderGeometry(0.12, 0.12, 1, 8);
+    laserGeo.rotateX(Math.PI / 2); // align along Z
+    
+    const laserMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending
+    });
+    const laserMesh = new THREE.Mesh(laserGeo, laserMat);
+    laserMesh.scale.set(1, 1, distance);
+    laserMesh.position.copy(start).add(end).multiplyScalar(0.5);
+    laserMesh.lookAt(end);
+    
+    scene.add(laserMesh);
+    
+    setTimeout(() => {
+        scene.remove(laserMesh);
+    }, 100);
+    
+    // If we hit a crystal, shatter it!
+    if (hitCrystal) {
+        shatterCrystal(hitCrystal, end);
+    }
+}
+
+function shatterCrystal(crystal, point) {
+    // Play explosion sound
+    playExplosionSound();
+    
+    const debrisColor = crystal.userData.originalColor || 0x00ff88;
+    
+    // 1. Spawn debris shards
+    const debrisGeo = new THREE.DodecahedronGeometry(0.2, 0);
+    const numDebris = 12;
+    for (let i = 0; i < numDebris; i++) {
+        const debrisMat = new THREE.MeshBasicMaterial({
+            color: debrisColor,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+        const debris = new THREE.Mesh(debrisGeo, debrisMat);
+        debris.position.copy(point);
+        
+        debris.userData = {
+            velocity: new THREE.Vector3(
+                (Math.random() - 0.5) * 1.5,
+                (Math.random() - 0.5) * 1.5,
+                (Math.random() - 0.5) * 1.5
+            ),
+            scaleDecay: 0.94 + Math.random() * 0.03
+        };
+        scene.add(debris);
+        crystalDebris.push(debris);
+    }
+    
+    // 2. Spawn harvestable energy matrix octahedron
+    const matrixGeo = new THREE.OctahedronGeometry(0.5, 0);
+    const matrixMat = new THREE.MeshStandardMaterial({
+        color: 0xffff00,
+        emissive: 0xffff00,
+        emissiveIntensity: 1.5,
+        transparent: true,
+        opacity: 0.9,
+        flatShading: true
+    });
+    const matrixMesh = new THREE.Mesh(matrixGeo, matrixMat);
+    matrixMesh.position.copy(crystal.position);
+    scene.add(matrixMesh);
+    energyMatrixes.push(matrixMesh);
+    
+    // 3. Object Pool Respawn: Move crystal way in front so corridor stays populated
+    crystal.position.set(
+        (Math.random() - 0.5) * 360,
+        (Math.random() - 0.5) * 220,
+        camera.position.z - 300 - Math.random() * 100
+    );
+    crystal.userData.collided = false; // reset collision flag
+}
+
+// --- Dynamic Audio Beeps ---
+function playLaserSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.15);
+        
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    } catch(e){}
+}
+
+function playPickupSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(900, audioCtx.currentTime + 0.08);
+        
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.22);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+    } catch(e){}
+}
+
+function playLockChirp() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.05);
+        
+        gain.gain.setValueAtTime(0.012, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+    } catch(e){}
+}
+
+function playRumbleSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(65, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(15, audioCtx.currentTime + 1.2);
+        
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1.25);
+    } catch(e){}
 }
 
 // ========================================

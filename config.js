@@ -30,6 +30,13 @@ const WORMHOLE_CONFIG = [
         color: 0x4cc9f0,        // Cyan/Blue
         position: { x: 0, y: 60, z: -220 },
         destination: './my_world_view/index.html'
+    },
+    {
+        id: 'my_web',
+        label: 'Research',
+        color: 0x9d4edd,        // Purple
+        position: { x: 90, y: 30, z: -200 },
+        destination: './my_web/index.html'
     }
 ];
 
