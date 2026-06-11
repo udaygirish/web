@@ -24,6 +24,15 @@ let zoomLevel = 1;
 const baseSpeed = 0.5;
 const starSystems = [];
 
+// Rover Mode State
+let isRoverMode = false;
+let roverScene = new THREE.Group(); // Holds the planet surface and rover
+let rover = null;
+let currentPlanetData = null;
+let roverVelocity = 0;
+let roverTurn = 0;
+let launchPad = null;
+
 // ========================================
 // Initialization
 // ========================================
@@ -32,6 +41,10 @@ function init() {
     // Scene
     scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x000000, 0.0005);
+    
+    // Rover scene setup
+    roverScene.visible = false;
+    scene.add(roverScene);
 
     // 3D Camera (Perspective)
     camera3D = new THREE.PerspectiveCamera(
@@ -126,178 +139,67 @@ function createStarfield() {
 function createSolarSystems() {
     const systems = [
         {
-            name: 'Experience',
+            name: 'My Journey',
             position: { x: 0, y: 0, z: 0 }, // Center system
-            starColor: 0xf77f00,
-            hasPath: true, // Enable sequential path for this system
+            starColor: 0xffffff,
+            hasPath: false,
             planets: [
                 {
-                    name: 'Quantiphi', orbit: 30, size: 6, color: 0xff9e3d, speed: 0.0012, sequence: 1, content: {
-                        title: 'Machine Learning Engineer',
-                        description: 'Quantiphi (May 2019 - Feb 2021)',
-                        details: ['CV solutions for safety monitoring', 'Document classification with Transformers', 'Federated Learning exploration']
-                    }
+                    name: 'Experience', orbit: 120, size: 18, color: 0xf77f00, speed: 0.0012, content: {
+                        title: 'Experience',
+                        description: 'My Professional Journey',
+                        details: ['Click to land and explore my work history.']
+                    },
+                    billboards: [
+                        { title: 'Quantiphi', desc: 'Machine Learning Engineer (May 2019 - Feb 2021)' },
+                        { title: 'New Space', desc: 'ML Engineer II (Feb 2021 - Jul 2021)' },
+                        { title: 'Tiger Analytics', desc: 'Machine Learning Engineer (Jan 2022 - Jul 2023)' },
+                        { title: 'WPI Perception', desc: 'Graduate Researcher (Aug 2023 - Feb 2024)' },
+                        { title: 'J&J', desc: 'SDS Intern - LLMs (Jun 2024 - Sep 2024)' },
+                        { title: 'WPI ELPIS', desc: 'Graduate Researcher (Jan 2024 - May 2025)' },
+                        { title: 'webAI', desc: 'Senior ML Engineer (May 2025 - Dec 2025)' },
+                        { title: 'Tiger Analytics', desc: 'Senior Machine Learning Engineer (Dec 2025 - Present)' }
+                    ]
                 },
                 {
-                    name: 'New Space', orbit: 45, size: 6.5, color: 0xffb366, speed: 0.0010, sequence: 2, content: {
-                        title: 'ML Engineer II',
-                        description: 'New Space Research (Feb 2021 - Jul 2021)',
-                        details: ['Deep learning for autonomous navigation', 'Jetson NX optimization', 'TensorRT & Deepstream']
-                    }
+                    name: 'Skills', orbit: 220, size: 14, color: 0x06ffa5, speed: 0.0008, content: {
+                        title: 'Skills',
+                        description: 'The tools and technologies I master.',
+                        details: ['Click to land and explore my skills.']
+                    },
+                    billboards: [
+                        { title: 'AI & ML', desc: 'Deep Learning, CV, RL' },
+                        { title: 'Programming', desc: 'Python, C++, JS' },
+                        { title: 'Cloud & Ops', desc: 'AWS, GCP, Docker' }
+                    ]
                 },
                 {
-                    name: 'Tiger Analytics', orbit: 60, size: 7, color: 0xf77f00, speed: 0.0009, sequence: 3, content: {
-                        title: 'Machine Learning Engineer',
-                        description: 'Tiger Analytics (Jan 2022 - Jul 2023)',
-                        details: ['Scalable MLOps on AWS/GCP', 'Unified data science platforms', '75% reduction in deployment time']
-                    }
+                    name: 'Projects', orbit: 320, size: 16, color: 0x9d4edd, speed: 0.0005, content: {
+                        title: 'Projects',
+                        description: 'Creative and technical projects.',
+                        details: ['Click to land and explore my projects.']
+                    },
+                    billboards: [
+                        { title: 'MinNav', desc: 'ICRA 2026' },
+                        { title: 'Robot Grasping', desc: 'ELPIS Lab' },
+                        { title: 'RIGGU V2', desc: 'Interactive Platform' },
+                        { title: 'Indoor Nav', desc: 'Motion Planning' },
+                        { title: '3R Manipulator', desc: 'Dynamics' },
+                        { title: 'Alien Catcher', desc: 'UAV Control' }
+                    ]
                 },
                 {
-                    name: 'WPI Perception', orbit: 75, size: 6, color: 0xffcc80, speed: 0.0008, sequence: 4, content: {
-                        title: 'Graduate Researcher',
-                        description: 'WPI Perception Group (Aug 2023 - Feb 2024)',
-                        details: ['Optical flow for quadrotors', 'Real-time CV algorithms', 'Autonomous navigation']
-                    }
-                },
-                {
-                    name: 'J&J', orbit: 90, size: 7.5, color: 0xff6b6b, speed: 0.0007, sequence: 5, content: {
-                        title: 'SDS Intern - LLMs',
-                        description: 'Johnson & Johnson (Jun 2024 - Sep 2024)',
-                        details: ['LLM pipelines for clinical data', 'Scalable NLP solutions', 'Healthcare data compliance']
-                    }
-                },
-                {
-                    name: 'WPI ELPIS', orbit: 105, size: 6.5, color: 0xffab91, speed: 0.0006, sequence: 6, content: {
-                        title: 'Graduate Researcher',
-                        description: 'ELPIS Lab (Jan 2024 - May 2025)',
-                        details: ['Robot grasping & manipulation', 'Reinforcement Learning', 'End-to-end robotics algorithms']
-                    }
-                },
-                {
-                    name: 'webAI', orbit: 120, size: 9, color: 0xff5722, speed: 0.0005, sequence: 7, content: {
-                        title: 'Senior ML Engineer',
-                        description: 'webAI (May 2025 - Dec 2025)',
-                        details: ['Production ML pipelines', 'Scaling intelligent applications', 'Computer Vision research']
-                    }
-                },
-                {
-                    name: 'Tiger Analytics (Sr. MLE)', orbit: 135, size: 9.5, color: 0xe65100, speed: 0.0004, sequence: 8, content: {
-                        title: 'Senior Machine Learning Engineer',
-                        description: 'Tiger Analytics (Dec 2025 - Present)',
-                        details: ['Leading ML engineering & MLOps development', 'Building LLM Agents, RAGs, and Digital Twins', 'Scaling production ML solutions']
-                    }
-                }
-            ]
-        },
-        {
-            name: 'Skills',
-            position: { x: -250, y: 50, z: -200 },
-            starColor: 0x06ffa5,
-            planets: [
-                {
-                    name: 'AI & ML', orbit: 40, size: 8.5, color: 0x06ffa5, speed: 0.001, content: {
-                        title: 'AI & Machine Learning',
-                        description: 'Core expertise',
-                        details: ['Deep Learning', 'Computer Vision', 'TensorFlow & PyTorch', 'Reinforcement Learning']
-                    }
-                },
-                {
-                    name: 'Programming', orbit: 60, size: 7.5, color: 0x2bffc1, speed: 0.0008, content: {
-                        title: 'Programming',
-                        description: 'Languages & Logic',
-                        details: ['Python (Expert)', 'C++ (Advanced)', 'JavaScript', 'SQL']
-                    }
-                },
-                {
-                    name: 'Cloud & Ops', orbit: 80, size: 6.5, color: 0x50ffcd, speed: 0.0006, content: {
-                        title: 'Cloud & MLOps',
-                        description: 'Infrastructure & Deployment',
-                        details: ['AWS & GCP', 'Docker & Kubernetes', 'Edge Computing (Jetson)', 'CI/CD']
-                    }
-                }
-            ]
-        },
-        {
-            name: 'Projects',
-            position: { x: 250, y: -50, z: -200 },
-            starColor: 0x9d4edd,
-            planets: [
-                {
-                    name: 'MinNav', orbit: 35, size: 7.5, color: 0x9d4edd, speed: 0.0010, content: {
-                        title: 'MinNav',
-                        description: 'Accepted ICRA 2026 / Submitted IEEE RAL',
-                        details: ['Optical flow navigation for tiny drones', 'Complex cluttered indoor navigation', 'Integrated on low-power edge platforms']
-                    }
-                },
-                {
-                    name: 'Robot Grasping', orbit: 50, size: 8, color: 0xae70ed, speed: 0.0008, content: {
-                        title: 'Robot Grasping & Manipulation',
-                        description: 'ELPIS Lab Research (WPI)',
-                        details: ['End-to-end reinforcement learning', 'UR10 pick-and-place', 'Language-grounded vision models']
-                    }
-                },
-                {
-                    name: 'RIGGU V2', orbit: 65, size: 7, color: 0xbe82f0, speed: 0.0007, content: {
-                        title: 'RIGGU V2 Semi-Humanoid',
-                        description: 'Interactive Robotics Platform',
-                        details: ['ROS & SLAM navigation framework', 'AI and Natural Language Processing integration', 'Mechanical fabrication and hardware tuning']
-                    }
-                },
-                {
-                    name: 'Indoor Nav', orbit: 80, size: 6.5, color: 0xce95f2, speed: 0.0006, content: {
-                        title: 'Indoor Robot Navigation',
-                        description: 'Embodied Agent Motion Planning',
-                        details: ['A* & RRT traditional planners comparison', 'End-to-end Reinforcement Learning approaches', 'Embodied navigation in simulated environments']
-                    }
-                },
-                {
-                    name: '3R Manipulator', orbit: 95, size: 6, color: 0xdea8f5, speed: 0.0005, content: {
-                        title: '3R Link Manipulator Dynamics',
-                        description: 'Robot Kinematics & Manipulation',
-                        details: ['Kinematic and dynamic modeling', 'Workspace trajectory control', 'MATLAB/Python numerical simulations']
-                    }
-                },
-                {
-                    name: 'Alien Catcher', orbit: 110, size: 6, color: 0xeebbf7, speed: 0.0004, content: {
-                        title: 'Alien Catcher UAV Control',
-                        description: 'LQR Quadrotor Guidance',
-                        details: ['Linear Quadratic Regulator control strategy', 'Autonomous UAV intercept & capture', 'Dynamic simulation in 3D physics engine']
-                    }
-                }
-            ]
-        },
-        {
-            name: 'Education',
-            position: { x: 0, y: -150, z: -400 },
-            starColor: 0x4361ee,
-            planets: [
-                {
-                    name: 'WPI', orbit: 40, size: 8, color: 0x4361ee, speed: 0.0010, content: {
-                        title: 'Worcester Polytechnic Institute (WPI)',
-                        description: 'MS in Robotics Engineering (Aug 2023 - May 2025)',
-                        details: ['GPA: 4.0/4.0', 'Focus: Robot Control, Dynamics, Motion Planning, Swarm Robotics', 'Thesis: MonoEye (Monocular Visual Odometry on Edge)']
-                    }
-                },
-                {
-                    name: 'IGNOU', orbit: 60, size: 7, color: 0x5371f0, speed: 0.0008, content: {
-                        title: 'Indira Gandhi National Open University (IGNOU)',
-                        description: 'Master of Arts in Philosophy (Oct 2020 - Dec 2022)',
-                        details: ['Part-time distance Master\'s degree', 'Focus: Epistemology, Logic, Ethics, Philosophy of Mind', 'Enhanced critical thinking and analytical modeling skills']
-                    }
-                },
-                {
-                    name: 'Hyderabad University', orbit: 80, size: 7, color: 0x6381f2, speed: 0.0006, content: {
-                        title: 'Central University of Hyderabad',
-                        description: 'Post Graduate Diploma in AI (Feb 2021 - Mar 2022)',
-                        details: ['Online diploma in collaboration with Applied Roots', 'Focus: Machine Learning, Deep Learning, CV, NLP', 'Minor Thesis: Multi-class classification on Cdiscount dataset']
-                    }
-                },
-                {
-                    name: 'Undergrad (NIT Calicut)', orbit: 100, size: 6.5, color: 0x7391f5, speed: 0.0004, content: {
-                        title: 'NIT Calicut',
-                        description: 'B.Tech in Mechanical Engineering (Jun 2015 - May 2019)',
-                        details: ['Core: Dynamics, Robotics, Control Systems, Thermal/Fluid Dynamics', 'Robotics Interest Group Club Lead', 'Honors / Best Project Award']
-                    }
+                    name: 'Education', orbit: 420, size: 15, color: 0x4361ee, speed: 0.0003, content: {
+                        title: 'Education',
+                        description: 'Academic background and achievements.',
+                        details: ['Click to land and explore my education.']
+                    },
+                    billboards: [
+                        { title: 'WPI', desc: 'MS Robotics Engineering' },
+                        { title: 'IGNOU', desc: 'MA Philosophy' },
+                        { title: 'Hyderabad Univ', desc: 'PG Diploma AI' },
+                        { title: 'NIT Calicut', desc: 'B.Tech Mech Eng' }
+                    ]
                 }
             ]
         }
@@ -588,6 +490,12 @@ function createCloudTexture(size) {
 function animate() {
     requestAnimationFrame(animate);
 
+    if (isRoverMode) {
+        updateRoverMovement();
+        renderer.render(scene, camera);
+        return;
+    }
+
     // Update camera based on controls
     updateMovement();
 
@@ -608,6 +516,13 @@ function animate() {
             if (planet.userData.clouds) {
                 planet.userData.clouds.rotation.y += planet.userData.clouds.userData.cloudRotation || 0.0005;
             }
+            
+            // Proximity Check for Landing
+            const worldPos = new THREE.Vector3();
+            planet.getWorldPosition(worldPos);
+            if (camera3D.position.distanceTo(worldPos) < planet.userData.size + 15) {
+                initiateLanding(planet);
+            }
         });
     });
 
@@ -626,6 +541,99 @@ function animate() {
 // ========================================
 // Movement
 // ========================================
+
+function updateRoverMovement() {
+    if (!rover) return;
+
+    const biome = roverScene.userData.biome;
+    const ground = roverScene.userData.ground;
+
+    // Check Water Physics
+    let inWater = false;
+    if (biome === 'forest' && rover.position.y < 2) {
+        inWater = true;
+    }
+
+    // Acceleration & Friction
+    const accel = inWater ? 0.02 : 0.05; // slower in water
+    const maxSpeed = inWater ? 0.5 : 2;
+    const friction = inWater ? 0.8 : 0.9;
+
+    if (controls.forward) roverVelocity += accel;
+    else if (controls.backward) roverVelocity -= accel;
+    else roverVelocity *= friction;
+
+    roverVelocity = Math.max(-maxSpeed/2, Math.min(roverVelocity, maxSpeed));
+
+    // Steering
+    const steerSpeed = inWater ? 0.02 : 0.05;
+    if (controls.left) rover.rotation.y += steerSpeed;
+    if (controls.right) rover.rotation.y -= steerSpeed;
+
+    // Apply Velocity horizontally
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(rover.quaternion);
+    // Project direction onto XZ plane to drive flat
+    dir.y = 0;
+    dir.normalize();
+    
+    rover.position.addScaledVector(dir, roverVelocity);
+
+    // Animate wheels
+    if (rover.userData.wheels) {
+        // Circumference = 2 * PI * r (r=1.2) => ~7.5. Rotation = Distance / Radius
+        const rotationAmount = -roverVelocity / 1.2; 
+        rover.userData.wheels.forEach(w => {
+            w.rotation.x += rotationAmount;
+        });
+    }
+
+    // Terrain Raycasting Physics
+    if (ground) {
+        const raycaster = new THREE.Raycaster();
+        const origin = rover.position.clone();
+        origin.y = 100; // Raycast from high up
+        const down = new THREE.Vector3(0, -1, 0);
+        raycaster.set(origin, down);
+
+        const intersects = raycaster.intersectObject(ground);
+        if (intersects.length > 0) {
+            const hit = intersects[0];
+            const targetY = hit.point.y;
+            
+            // Smoothly interpolate height
+            rover.position.y += (targetY - rover.position.y) * 0.2;
+
+            // Tilt Chassis to match terrain normal
+            const normal = hit.face.normal.clone();
+            // Transform normal to world space if ground is rotated
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(ground.matrixWorld);
+            normal.applyMatrix3(normalMatrix).normalize();
+
+            // Calculate target quaternion to align up vector with normal
+            const targetQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+            // Apply heading rotation
+            const headingQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rover.rotation.y);
+            targetQuat.multiply(headingQuat);
+
+            // Smooth slerp rotation
+            rover.quaternion.slerp(targetQuat, 0.1);
+        }
+    }
+
+    // Chase Camera
+    const offset = new THREE.Vector3(0, 12, 30); // Slightly higher and further back
+    offset.applyAxisAngle(new THREE.Vector3(0,1,0), rover.rotation.y);
+    const targetPos = rover.position.clone().add(offset);
+    camera3D.position.lerp(targetPos, 0.1);
+    camera3D.lookAt(rover.position.clone().add(new THREE.Vector3(0, 3, 0)));
+    
+    // Check Launch Pad collision
+    if (launchPad) {
+        if (rover.position.distanceTo(launchPad.position) < 15) {
+            returnToOrbit();
+        }
+    }
+}
 
 function updateMovement() {
     if (currentView !== '3D') return;
@@ -940,10 +948,429 @@ function showPlanetInfo(planet) {
         <ul>
             ${content.details.map(detail => `<li>${detail}</li>`).join('')}
         </ul>
+        <button id="land-btn" class="btn btn-primary" style="margin-top: 15px; width: 100%;">Initiate Landing</button>
     `;
 
     document.getElementById('cardContent').innerHTML = contentHTML;
     document.getElementById('planetInfoCard').classList.add('active');
+    
+    document.getElementById('land-btn').onclick = () => {
+        initiateLanding(planet);
+    };
+}
+
+// ========================================
+// Surface Environment Generation
+// ========================================
+
+function createSurfaceEnvironment(planetData) {
+    const name = planetData.name;
+    let skyColor, groundColor, fogDensity;
+    let biome = 'desert';
+
+    if (name === 'Experience') {
+        skyColor = 0xb7410e; groundColor = 0xc1440e; fogDensity = 0.015; biome = 'desert';
+    } else if (name === 'Skills') {
+        skyColor = 0x87CEEB; groundColor = 0x228b22; fogDensity = 0.005; biome = 'forest';
+    } else if (name === 'Projects') {
+        skyColor = 0x2e004f; groundColor = 0x4a0e4e; fogDensity = 0.015; biome = 'alien';
+    } else {
+        skyColor = 0xd4f1f9; groundColor = 0xffffff; fogDensity = 0.008; biome = 'ice';
+    }
+
+    // Remove scene.background so the starry sky is visible!
+    scene.background = null; 
+    scene.fog = new THREE.FogExp2(skyColor, fogDensity);
+
+    // 1. Terrain
+    const groundGeo = new THREE.PlaneGeometry(1000, 1000, 100, 100);
+    const pos = groundGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const dist = Math.sqrt(x*x + y*y);
+        let height = 0;
+        
+        // Create a clear, flat driving path down the center z-axis
+        const isPath = Math.abs(x) < 30; 
+        
+        if (dist > 50 && !isPath) {
+            // Mildly bumpy terrain
+            if (biome === 'forest') height = Math.sin(x/30)*5 + Math.cos(y/30)*5;
+            else if (biome === 'desert') height = Math.sin(x/20)*6 + Math.cos(y/20)*6 + Math.random()*1;
+            else if (biome === 'alien') height = Math.abs(Math.sin(x/15)*10) + Math.cos(y/15)*5;
+            else height = (Math.random() * 1) + Math.sin(x/40)*2; // ice
+        }
+        pos.setZ(i, height);
+    }
+    groundGeo.computeVertexNormals();
+
+    const groundMat = new THREE.MeshStandardMaterial({
+        color: groundColor,
+        roughness: biome === 'ice' ? 0.1 : 0.9,
+        metalness: biome === 'ice' ? 0.8 : 0.1,
+        flatShading: biome === 'alien'
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    roverScene.add(ground);
+    
+    // Store ground for raycasting physics later
+    roverScene.userData.ground = ground;
+    roverScene.userData.biome = biome;
+
+    // Water for forest
+    if (biome === 'forest') {
+        const waterGeo = new THREE.PlaneGeometry(1000, 1000);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x1ca3ec,
+            transparent: true,
+            opacity: 0.8,
+            roughness: 0.1,
+            metalness: 0.8
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = 2; // Fill valleys
+        roverScene.add(water);
+    }
+
+    // Instanced Objects
+    let objCount = 250;
+    let objGeo, objMat;
+    
+    if (biome === 'forest') {
+        objGeo = new THREE.ConeGeometry(3, 15, 8);
+        objGeo.translate(0, 7.5, 0); 
+        objMat = new THREE.MeshStandardMaterial({color: 0x004400, roughness: 1.0});
+    } else if (biome === 'desert') {
+        objGeo = new THREE.DodecahedronGeometry(3, 1);
+        objGeo.translate(0, 1.5, 0);
+        objMat = new THREE.MeshStandardMaterial({color: 0x8a3324, roughness: 1.0});
+    } else if (biome === 'alien') {
+        objCount = 150;
+        objGeo = new THREE.CylinderGeometry(0, 2, 20, 6);
+        objGeo.translate(0, 10, 0);
+        objMat = new THREE.MeshStandardMaterial({color: 0x00ffcc, emissive: 0x005544});
+    } else {
+        objCount = 100;
+        objGeo = new THREE.IcosahedronGeometry(4, 0);
+        objGeo.translate(0, 2, 0);
+        objMat = new THREE.MeshStandardMaterial({color: 0xaaddff, roughness: 0.1, metalness: 0.9});
+    }
+
+    const instancedMesh = new THREE.InstancedMesh(objGeo, objMat, objCount);
+    const dummy = new THREE.Object3D();
+    const raycaster = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+
+    for (let i = 0; i < objCount; i++) {
+        let x = (Math.random() - 0.5) * 800;
+        let z = (Math.random() - 0.5) * 800;
+        if (Math.abs(x) < 50) continue; // Keep driving path clear
+        
+        raycaster.set(new THREE.Vector3(x, 100, z), down);
+        const intersects = raycaster.intersectObject(ground);
+        if (intersects.length > 0) {
+            const y = intersects[0].point.y;
+            if (biome === 'forest' && y < 2) continue; // Don't spawn underwater
+            
+            dummy.position.set(x, y, z);
+            if (biome !== 'forest' && biome !== 'alien') {
+                dummy.rotation.x = Math.random() * Math.PI;
+                dummy.rotation.z = Math.random() * Math.PI;
+            }
+            dummy.scale.setScalar(0.5 + Math.random() * 1.5);
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+    }
+    roverScene.add(instancedMesh);
+
+    // 2. Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    roverScene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(100, 200, 50);
+    roverScene.add(dirLight);
+
+    // 3. Rover Mesh
+    rover = new THREE.Group();
+    
+    // Main Chassis
+    const chassisGeo = new THREE.BoxGeometry(4, 1.5, 8);
+    const chassisMat = new THREE.MeshStandardMaterial({color: 0xdddddd, metalness: 0.8, roughness: 0.2});
+    const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+    chassis.position.y = 1.5;
+    rover.add(chassis);
+
+    // Cockpit Window
+    const cockpitGeo = new THREE.BoxGeometry(3, 1.2, 3);
+    const cockpitMat = new THREE.MeshStandardMaterial({color: 0x111111, metalness: 0.9, roughness: 0.1});
+    const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+    cockpit.position.set(0, 2.5, -1);
+    rover.add(cockpit);
+
+    // Solar Panel / Roof Rack
+    const panelGeo = new THREE.PlaneGeometry(3.5, 4);
+    const panelMat = new THREE.MeshStandardMaterial({color: 0x003366, metalness: 1.0, roughness: 0.2, side: THREE.DoubleSide});
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.rotation.x = -Math.PI / 2;
+    panel.position.set(0, 2.3, 2);
+    rover.add(panel);
+
+    // Antenna
+    const antennaGeo = new THREE.CylinderGeometry(0.05, 0.05, 3);
+    const antennaMat = new THREE.MeshStandardMaterial({color: 0x555555});
+    const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+    antenna.position.set(1.5, 3.5, 3);
+    rover.add(antenna);
+    
+    const bulbGeo = new THREE.SphereGeometry(0.2);
+    const bulbMat = new THREE.MeshBasicMaterial({color: 0xff0000});
+    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+    bulb.position.set(1.5, 5, 3);
+    rover.add(bulb);
+    
+    // Wheels with Hubcaps
+    const wheelGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 24);
+    wheelGeo.rotateZ(Math.PI/2);
+    const wheelMat = new THREE.MeshStandardMaterial({color: 0x222222, roughness: 0.9});
+    const hubcapGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.05, 12);
+    hubcapGeo.rotateZ(Math.PI/2);
+    const hubcapMat = new THREE.MeshStandardMaterial({color: 0xaaaaaa, metalness: 0.9});
+    
+    const wheelPositions = [
+        [-2.5, 1.2, 3], [2.5, 1.2, 3], [-2.5, 1.2, -3], [2.5, 1.2, -3]
+    ];
+    
+    // To allow rotation animation, we can store wheels in an array
+    rover.userData.wheels = [];
+    
+    wheelPositions.forEach(p => {
+        const wheelGroup = new THREE.Group();
+        
+        const w = new THREE.Mesh(wheelGeo, wheelMat);
+        wheelGroup.add(w);
+        
+        const h = new THREE.Mesh(hubcapGeo, hubcapMat);
+        wheelGroup.add(h);
+        
+        wheelGroup.position.set(...p);
+        rover.add(wheelGroup);
+        rover.userData.wheels.push(wheelGroup);
+    });
+
+    // Dual Headlights
+    const headlightMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+    const lightGeo = new THREE.CircleGeometry(0.4, 16);
+    
+    const hl1 = new THREE.Mesh(lightGeo, headlightMat);
+    hl1.position.set(-1.2, 1.5, -4.01);
+    hl1.rotation.y = Math.PI;
+    rover.add(hl1);
+    
+    const hl2 = new THREE.Mesh(lightGeo, headlightMat);
+    hl2.position.set(1.2, 1.5, -4.01);
+    hl2.rotation.y = Math.PI;
+    rover.add(hl2);
+
+    const headlightSpot1 = new THREE.SpotLight(0xffffff, 1.5, 200, Math.PI/5, 0.5, 1);
+    headlightSpot1.position.set(-1.2, 1.5, -4);
+    const target1 = new THREE.Object3D();
+    target1.position.set(-1.2, 0, -20);
+    rover.add(target1);
+    headlightSpot1.target = target1;
+    rover.add(headlightSpot1);
+    
+    const headlightSpot2 = new THREE.SpotLight(0xffffff, 1.5, 200, Math.PI/5, 0.5, 1);
+    headlightSpot2.position.set(1.2, 1.5, -4);
+    const target2 = new THREE.Object3D();
+    target2.position.set(1.2, 0, -20);
+    rover.add(target2);
+    headlightSpot2.target = target2;
+    rover.add(headlightSpot2);
+
+    // Tail lights
+    const tailMat = new THREE.MeshBasicMaterial({color: 0xff0000});
+    const tl1 = new THREE.Mesh(lightGeo, tailMat);
+    tl1.position.set(-1.2, 1.5, 4.01);
+    rover.add(tl1);
+    const tl2 = new THREE.Mesh(lightGeo, tailMat);
+    tl2.position.set(1.2, 1.5, 4.01);
+    rover.add(tl2);
+
+    rover.position.set(0, 0, 0);
+    roverScene.add(rover);
+
+    // 4. Billboards (Experiences)
+    if (planetData.billboards) {
+        let zPos = -30;
+        planetData.billboards.forEach((board, index) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw background
+            ctx.fillStyle = 'rgba(0, 20, 15, 0.8)';
+            ctx.fillRect(0, 0, 512, 256);
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, 512, 256);
+            
+            // Draw text
+            ctx.fillStyle = '#00ff88';
+            ctx.font = 'bold 40px "Orbitron", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(board.title, 256, 100);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '24px "Inter", sans-serif';
+            ctx.fillText(board.desc, 256, 160);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            const planeGeo = new THREE.PlaneGeometry(16, 8);
+            const planeMat = new THREE.MeshBasicMaterial({map: tex, transparent: true, side: THREE.DoubleSide});
+            const mesh = new THREE.Mesh(planeGeo, planeMat);
+            
+            mesh.position.set((index % 2 === 0 ? 15 : -15), 5, zPos);
+            // Angle slightly towards the path
+            mesh.rotation.y = (index % 2 === 0 ? -Math.PI/6 : Math.PI/6);
+            
+            roverScene.add(mesh);
+            zPos -= 50; // Space them out along the path
+        });
+
+        // 5. Launch Pad at the end of the path
+        const padGeo = new THREE.CylinderGeometry(10, 10, 1, 32);
+        const padMat = new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x005522});
+        launchPad = new THREE.Mesh(padGeo, padMat);
+        launchPad.position.set(0, 0.5, zPos);
+        roverScene.add(launchPad);
+    }
+}
+
+// ========================================
+// Rover and Landing Mechanics
+// ========================================
+
+function initiateLanding(planet) {
+    if (isRoverMode) return;
+    isRoverMode = true;
+    currentPlanetData = planet.userData;
+    
+    // Stop spaceship movement
+    controls.forward = false;
+    controls.backward = false;
+    
+    // Trigger White-out
+    const overlay = document.getElementById('landing-overlay');
+    overlay.style.opacity = '1';
+    
+    setTimeout(() => {
+        // Hide solar system
+        starSystems.forEach(system => system.group.visible = false);
+        
+        // Show rover scene
+        roverScene.visible = true;
+        
+        // Generate surface
+        createSurfaceEnvironment(currentPlanetData);
+        
+        // Hide UI elements
+        document.getElementById('planetInfoCard').classList.remove('active');
+        document.querySelector('.view-toggle').style.display = 'none';
+        
+        // Add Return Button dynamically
+        let btn = document.getElementById('return-orbit-btn');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'return-orbit-btn';
+            btn.className = 'btn btn-primary';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '20px';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.zIndex = '1000';
+            btn.textContent = 'Return to Orbit';
+            btn.onclick = returnToOrbit;
+            document.body.appendChild(btn);
+        }
+        btn.style.display = 'block';
+
+        // Add Driving Instructions dynamically
+        let instructions = document.getElementById('rover-instructions');
+        if (!instructions) {
+            instructions = document.createElement('div');
+            instructions.id = 'rover-instructions';
+            instructions.style.position = 'fixed';
+            instructions.style.bottom = '80px';
+            instructions.style.left = '50%';
+            instructions.style.transform = 'translateX(-50%)';
+            instructions.style.zIndex = '1000';
+            instructions.style.color = '#00ff88';
+            instructions.style.fontFamily = '"Orbitron", sans-serif';
+            instructions.style.fontSize = '1.2rem';
+            instructions.style.textShadow = '0 0 10px rgba(0, 255, 136, 0.8)';
+            instructions.style.pointerEvents = 'none';
+            instructions.innerHTML = 'W: Accelerate | S: Brake/Reverse | A/D: Steer';
+            document.body.appendChild(instructions);
+        }
+        instructions.style.display = 'block';
+        
+        // Fade back in
+        overlay.style.opacity = '0';
+    }, 2000); // 2 second white-out
+}
+
+function returnToOrbit() {
+    if (!isRoverMode) return;
+    
+    // Trigger White-out
+    const overlay = document.getElementById('landing-overlay');
+    overlay.style.opacity = '1';
+    
+    setTimeout(() => {
+        isRoverMode = false;
+        roverScene.visible = false;
+        
+        // Reset environment
+        scene.background = null;
+        scene.fog = new THREE.FogExp2(0x000000, 0.0005);
+        
+        // Show solar system
+        starSystems.forEach(system => system.group.visible = true);
+        
+        // Reset camera position slightly back from the planet to avoid re-triggering
+        if (currentPlanetData && currentPlanetData.planet) {
+            const worldPos = new THREE.Vector3();
+            currentPlanetData.planet.getWorldPosition(worldPos);
+            // Move camera away from the planet towards the center
+            const dir = worldPos.clone().normalize().negate();
+            camera3D.position.copy(worldPos).add(dir.multiplyScalar(40));
+            camera3D.lookAt(0,0,0);
+        }
+        
+        // Show UI elements
+        document.querySelector('.view-toggle').style.display = 'flex';
+        const btn = document.getElementById('return-orbit-btn');
+        if (btn) btn.style.display = 'none';
+        
+        const instructions = document.getElementById('rover-instructions');
+        if (instructions) instructions.style.display = 'none';
+        
+        // Clear old surface to save memory
+        while(roverScene.children.length > 0){ 
+            roverScene.remove(roverScene.children[0]); 
+        }
+        rover = null;
+        launchPad = null;
+        
+        // Fade back in
+        overlay.style.opacity = '0';
+    }, 2000);
 }
 
 // ========================================
