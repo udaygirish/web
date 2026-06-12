@@ -32,6 +32,25 @@ let currentPlanetData = null;
 let roverVelocity = 0;
 let roverTurn = 0;
 let launchPad = null;
+let currentInteractiveKioskBoard = null;
+
+// Rover mouse-look state
+// Tracks angular offsets applied to the chase camera so the player can
+// look around independently of the rover's heading.
+let roverLookYaw   = 0;   // horizontal look offset (radians)
+let roverLookPitch = 0;   // vertical look offset (radians)
+const ROVER_LOOK_SENSITIVITY = 0.003;
+const ROVER_PITCH_LIMIT      = Math.PI / 4; // ±45°
+
+// Surface ambient particles (dust, fireflies, spores, snow)
+let surfaceParticles = null;
+let surfaceParticleTime = 0;
+
+// WebAudio
+let audioCtx = null;
+let droneOsc = null;
+let droneGain = null;
+let droneFilter = null;
 
 // ========================================
 // Initialization
@@ -249,37 +268,37 @@ function createSystem(data) {
     group.position.set(data.position.x, data.position.y, data.position.z);
     group.userData.name = data.name;
 
-    // Create central star.
-    // MeshBasicMaterial is unlit and ignores emissive/emissiveIntensity;
-    // those fields are removed to avoid misleading dead properties.
+    // Central star — MeshBasicMaterial (unlit, no emissive needed)
     const starGeometry = new THREE.SphereGeometry(12, 32, 32);
-    const starMaterial = new THREE.MeshBasicMaterial({
-        color: data.starColor
-    });
+    const starMaterial = new THREE.MeshBasicMaterial({ color: data.starColor });
     const star = new THREE.Mesh(starGeometry, starMaterial);
     group.add(star);
 
-    // Add star glow
-    const glowGeometry = new THREE.SphereGeometry(15, 32, 32);
+    // Star glow halo
+    const glowGeometry = new THREE.SphereGeometry(18, 32, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
         color: data.starColor,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.18,
         blending: THREE.AdditiveBlending
     });
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    group.add(glow);
+    group.add(new THREE.Mesh(glowGeometry, glowMaterial));
 
-    // Create planets
+    // Star PointLight — illuminates planet day-sides, dims night-sides
+    const starLight = new THREE.PointLight(data.starColor, 1.8, 700);
+    group.add(starLight);
+
+    // Create planets + orbit rings
     const systemPlanets = [];
     data.planets.forEach(planetData => {
         const planet = createPlanet(planetData);
-        planet.userData.orbit = planetData.orbit;
-        planet.userData.speed = planetData.speed;
-        planet.userData.angle = Math.random() * Math.PI * 2;
-        planet.userData.content = planetData.content;
-        planet.userData.systemName = data.name;
-        planet.userData.sequence = planetData.sequence; // Store sequence for path
+        planet.userData.orbit       = planetData.orbit;
+        planet.userData.speed       = planetData.speed;
+        planet.userData.angle       = Math.random() * Math.PI * 2;
+        planet.userData.content     = planetData.content;
+        planet.userData.systemName  = data.name;
+        planet.userData.sequence    = planetData.sequence;
+        planet.userData.billboards  = planetData.billboards; // carry billboard data
 
         planet.position.x = Math.cos(planet.userData.angle) * planetData.orbit;
         planet.position.z = Math.sin(planet.userData.angle) * planetData.orbit;
@@ -287,6 +306,26 @@ function createSystem(data) {
         group.add(planet);
         systemPlanets.push(planet);
         planets.push(planet);
+
+        // Orbit ring — faint dashed ellipse lying flat on Y=0
+        const orbitPoints = [];
+        const SEG = 128;
+        for (let i = 0; i <= SEG; i++) {
+            const a = (i / SEG) * Math.PI * 2;
+            orbitPoints.push(new THREE.Vector3(
+                Math.cos(a) * planetData.orbit,
+                0,
+                Math.sin(a) * planetData.orbit
+            ));
+        }
+        const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+        const orbitMat = new THREE.LineBasicMaterial({
+            color: planetData.color,
+            transparent: true,
+            opacity: 0.12,
+            blending: THREE.AdditiveBlending
+        });
+        group.add(new THREE.LineLoop(orbitGeo, orbitMat));
     });
 
     return {
@@ -487,11 +526,63 @@ function createCloudTexture(size) {
 // Animation Loop
 // ========================================
 
+// Tracks launch pad pulse animation
+let launchPadPulseTime = 0;
+
 function animate() {
     requestAnimationFrame(animate);
 
     if (isRoverMode) {
         updateRoverMovement();
+
+        // Pulse the launch pad light if present
+        if (launchPad && launchPad.userData.light) {
+            launchPadPulseTime += 0.05;
+            launchPad.userData.light.intensity = 1.5 + Math.sin(launchPadPulseTime) * 1.0;
+        }
+
+        // Animate surface ambient particles
+        if (surfaceParticles) {
+            surfaceParticleTime += 0.016;
+            const positions = surfaceParticles.geometry.attributes.position;
+            const biome = roverScene.userData.biome;
+
+            for (let i = 0; i < positions.count; i++) {
+                let py = positions.getY(i);
+                const px = positions.getX(i);
+                const pz = positions.getZ(i);
+
+                if (biome === 'ice') {
+                    // Snow: fall downward, wrap at ground level
+                    py -= 0.08 + Math.random() * 0.05;
+                    if (py < 0) py += 60;
+                } else if (biome === 'desert') {
+                    // Dust: drift sideways and upward slowly
+                    positions.setX(i, px + Math.sin(surfaceParticleTime * 0.5 + i) * 0.04);
+                    py += 0.02;
+                    if (py > 40) py -= 40;
+                } else if (biome === 'forest') {
+                    // Fireflies: slow sine-wave float
+                    positions.setY(i, py + Math.sin(surfaceParticleTime + i * 0.3) * 0.03);
+                } else if (biome === 'alien') {
+                    // Spores: drift upward and spiral
+                    positions.setX(i, px + Math.cos(surfaceParticleTime * 0.4 + i) * 0.05);
+                    py += 0.025;
+                    if (py > 50) py -= 50;
+                }
+                positions.setY(i, py);
+            }
+            positions.needsUpdate = true;
+        }
+
+        // Update 2D planet labels if in 2D mode
+        if (currentView === '2D') {
+            update2DLabels();
+        } else {
+            const labelsContainer = document.getElementById('labels-2d-container');
+            if (labelsContainer) labelsContainer.style.display = 'none';
+        }
+
         renderer.render(scene, camera);
         return;
     }
@@ -516,12 +607,19 @@ function animate() {
             if (planet.userData.clouds) {
                 planet.userData.clouds.rotation.y += planet.userData.clouds.userData.cloudRotation || 0.0005;
             }
-            
-            // Proximity Check for Landing
+
+            // Proximity approach HUD — show landing hint, never auto-land
             const worldPos = new THREE.Vector3();
             planet.getWorldPosition(worldPos);
-            if (camera3D.position.distanceTo(worldPos) < planet.userData.size + 15) {
-                initiateLanding(planet);
+            const dist = camera3D.position.distanceTo(worldPos);
+            const approachEl = document.getElementById('planet-approach-hud');
+            if (approachEl && currentView === '3D') {
+                if (dist < 80 && dist > (planet.userData.size || 15) + 8) {
+                    approachEl.textContent = `PLANET: ${planet.userData.name}  |  DIST: ${Math.round(dist)}u  |  CLICK TO LAND`;
+                    approachEl.classList.add('visible');
+                } else {
+                    approachEl.classList.remove('visible');
+                }
             }
         });
     });
@@ -534,6 +632,14 @@ function animate() {
 
     // Update Info Card Position
     updateInfoCardPosition();
+
+    // Update 2D Labels
+    if (currentView === '2D') {
+        update2DLabels();
+    } else {
+        const labelsContainer = document.getElementById('labels-2d-container');
+        if (labelsContainer) labelsContainer.style.display = 'none';
+    }
 
     renderer.render(scene, camera);
 }
@@ -620,20 +726,58 @@ function updateRoverMovement() {
         }
     }
 
-    // Chase Camera
-    const offset = new THREE.Vector3(0, 12, 30); // Slightly higher and further back
-    offset.applyAxisAngle(new THREE.Vector3(0,1,0), rover.rotation.y);
-    const targetPos = rover.position.clone().add(offset);
+    // Seamless world-wrap — fog hides the jump completely.
+    // WRAP radius should be <= TERRAIN_SIZE/2 - margin.
+    const WRAP = 270;
+    if (rover.position.x >  WRAP) rover.position.x -= WRAP * 2;
+    if (rover.position.x < -WRAP) rover.position.x += WRAP * 2;
+    if (rover.position.z >  WRAP) rover.position.z -= WRAP * 2;
+    if (rover.position.z < -WRAP) rover.position.z += WRAP * 2;
+
+    // Chase Camera with mouse-look yaw/pitch offset
+    const baseOffset = new THREE.Vector3(0, 12, 30);
+    baseOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), rover.rotation.y + roverLookYaw);
+    const targetPos = rover.position.clone().add(baseOffset);
     camera3D.position.lerp(targetPos, 0.1);
-    camera3D.lookAt(rover.position.clone().add(new THREE.Vector3(0, 3, 0)));
-    
-    // Check Launch Pad collision
-    if (launchPad) {
-        if (rover.position.distanceTo(launchPad.position) < 15) {
-            returnToOrbit();
+
+    // Look-at point: rover center + pitch offset
+    const lookTarget = rover.position.clone().add(new THREE.Vector3(0, 3, 0));
+    // Apply vertical look by shifting target up/down
+    lookTarget.y += Math.tan(roverLookPitch) * 30;
+    camera3D.lookAt(lookTarget);
+
+    // Update rover HUD speed display
+    const speedEl = document.getElementById('rover-speed');
+    if (speedEl) speedEl.textContent = Math.abs(roverVelocity).toFixed(2) + ' m/s';
+
+    // Update Compass
+    const compassNeedle = document.getElementById('compass-needle');
+    if (compassNeedle) {
+        const deg = rover.rotation.y * (180 / Math.PI);
+        compassNeedle.style.transform = `rotate(${-deg}deg)`;
+    }
+
+    // Check Kiosk Proximity
+    if (roverScene.userData.kiosks) {
+        let nearKiosk = null;
+        for (let k of roverScene.userData.kiosks) {
+            if (rover.position.distanceTo(k.position) < 8) {
+                nearKiosk = k;
+                break;
+            }
+        }
+        
+        const hintEl = document.getElementById('interact-hint');
+        if (nearKiosk) {
+            currentInteractiveKioskBoard = nearKiosk.userData.board;
+            if (hintEl) hintEl.style.display = 'flex';
+        } else {
+            currentInteractiveKioskBoard = null;
+            if (hintEl) hintEl.style.display = 'none';
         }
     }
 }
+
 
 function updateMovement() {
     if (currentView !== '3D') return;
@@ -691,6 +835,37 @@ function updateInfoCardPosition() {
     card.style.top  = `${clampedY}px`;
 }
 
+function update2DLabels() {
+    const container = document.getElementById('labels-2d-container');
+    if (!container) return;
+    
+    container.style.display = 'block';
+    
+    // Create/update labels
+    planets.forEach((planet, index) => {
+        let label = document.getElementById(`label-2d-${index}`);
+        if (!label) {
+            label = document.createElement('div');
+            label.id = `label-2d-${index}`;
+            label.className = 'label-2d';
+            label.textContent = planet.userData.name || 'Unknown';
+            container.appendChild(label);
+        }
+        
+        // Project position
+        const pos = new THREE.Vector3();
+        planet.getWorldPosition(pos);
+        pos.project(camera2D);
+        
+        const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(pos.y * 0.5) + 0.5) * window.innerHeight;
+        
+        // Offset slightly
+        label.style.left = `${x}px`;
+        label.style.top = `${y - 15}px`;
+    });
+}
+
 function updateSystemInfo() {
     let nearestSystem = null;
     let minDistance = Infinity;
@@ -717,30 +892,46 @@ function updateSystemInfo() {
 function setupEventListeners() {
     window.addEventListener('resize', onWindowResize);
 
-    // Helper: show the construction warning on first movement key press.
-    function triggerConstructionWarning() {
-        if (window.hasShownWarning) return;
-        const warning = document.getElementById('constructionWarning');
-        if (!warning) return;
-        warning.classList.add('visible');
-        window.hasShownWarning = true;
-        setTimeout(() => warning.classList.remove('visible'), 3000);
-    }
-
     window.addEventListener('keydown', (e) => {
         switch (e.key.toLowerCase()) {
-            case 'w': controls.forward  = true; triggerConstructionWarning(); break;
-            case 's': controls.backward = true; triggerConstructionWarning(); break;
-            case 'a': controls.left     = true; triggerConstructionWarning(); break;
-            case 'd': controls.right    = true; triggerConstructionWarning(); break;
+            case 'w': controls.forward  = true; break;
+            case 's': controls.backward = true; break;
+            case 'a': controls.left     = true; break;
+            case 'd': controls.right    = true; break;
             case ' ':
                 controls.up = true;
                 e.preventDefault();
-                triggerConstructionWarning();
                 break;
             case 'shift':
                 controls.down = true;
-                triggerConstructionWarning();
+                break;
+            case 'e':
+                // E key = Launch from planet surface
+                if (isRoverMode) returnToOrbit();
+                break;
+            case 'f':
+                // F key = Interact with Kiosk
+                if (isRoverMode && currentInteractiveKioskBoard) {
+                    const modal = document.getElementById('kiosk-modal');
+                    if (modal.style.display === 'none') {
+                        document.getElementById('kiosk-title').textContent = currentInteractiveKioskBoard.title;
+                        document.getElementById('kiosk-body').innerHTML = `
+                            <p>${currentInteractiveKioskBoard.desc}</p>
+                            <p style="margin-top:20px; color:#888;">(Detailed content can be placed here. e.g. project links, deeper descriptions, embedded videos, or GitHub repo links.)</p>
+                        `;
+                        const actionBtn = document.getElementById('kiosk-action-btn');
+                        actionBtn.style.display = 'inline-block';
+                        actionBtn.href = '#'; // Update with actual links from config later
+                        
+                        modal.style.display = 'flex';
+                        if (document.pointerLockElement) document.exitPointerLock();
+                    } else {
+                        modal.style.display = 'none';
+                    }
+                }
+                break;
+            case 'escape':
+                document.getElementById('kiosk-modal').style.display = 'none';
                 break;
         }
     });
@@ -771,6 +962,20 @@ function setupEventListeners() {
     });
 
     canvas.addEventListener('mousemove', (e) => {
+        // Rover mouse-look (right-mouse-button held or pointer locked)
+        if (isRoverMode && (e.buttons === 2 || document.pointerLockElement === canvas)) {
+            roverLookYaw   -= e.movementX * ROVER_LOOK_SENSITIVITY;
+            roverLookPitch  = Math.max(-ROVER_PITCH_LIMIT,
+                              Math.min(ROVER_PITCH_LIMIT,
+                              roverLookPitch - e.movementY * ROVER_LOOK_SENSITIVITY));
+            return;
+        }
+        // Reset look toward rover heading when no mouse button held
+        if (isRoverMode && e.buttons === 0) {
+            roverLookYaw   *= 0.92; // Spring back
+            roverLookPitch *= 0.92;
+        }
+
         if (currentView === '2D' && isDragging) {
             const deltaX = e.clientX - previousMousePosition.x;
             const deltaY = e.clientY - previousMousePosition.y;
@@ -781,6 +986,21 @@ function setupEventListeners() {
             camera2D.position.z -= deltaY * moveSpeed;
 
             previousMousePosition = { x: e.clientX, y: e.clientY };
+        }
+    });
+
+    // Right-click on canvas in rover mode requests pointer lock for full mouse-look
+    canvas.addEventListener('contextmenu', (e) => {
+        if (isRoverMode) {
+            e.preventDefault();
+            canvas.requestPointerLock();
+        }
+    });
+    // Release pointer lock on E (launch) or Escape
+    document.addEventListener('pointerlockchange', () => {
+        if (!document.pointerLockElement) {
+            roverLookYaw   = 0;
+            roverLookPitch = 0;
         }
     });
 
@@ -816,6 +1036,11 @@ function setupEventListeners() {
     document.getElementById('closeCardBtn').addEventListener('click', () => {
         document.getElementById('planetInfoCard').classList.remove('active');
         selectedObject = null;
+    });
+
+    // Close kiosk modal
+    document.getElementById('closeKioskBtn').addEventListener('click', () => {
+        document.getElementById('kiosk-modal').style.display = 'none';
     });
 }
 
@@ -939,11 +1164,25 @@ function showSystemInfo(system) {
 
 function showPlanetInfo(planet) {
     const content = planet.userData.content;
+    const billboards = planet.userData.billboards || [];
 
     document.getElementById('cardTitle').textContent = content.title;
 
+    let billboardHTML = '';
+    if (billboards.length > 0) {
+        billboardHTML = '<h3>Features</h3><ul>';
+        billboards.slice(0, 4).forEach(b => {
+            billboardHTML += `<li><strong>${b.title}</strong>: ${b.desc}</li>`;
+        });
+        if (billboards.length > 4) {
+            billboardHTML += `<li>...and ${billboards.length - 4} more.</li>`;
+        }
+        billboardHTML += '</ul>';
+    }
+
     const contentHTML = `
         <p>${content.description}</p>
+        ${billboardHTML}
         <h3>Details</h3>
         <ul>
             ${content.details.map(detail => `<li>${detail}</li>`).join('')}
@@ -968,22 +1207,25 @@ function createSurfaceEnvironment(planetData) {
     let skyColor, groundColor, fogDensity;
     let biome = 'desert';
 
+    // Biome-tuned fog: thick enough that the terrain edge is NEVER visible.
+    // The world wraps seamlessly under the fog cover.
     if (name === 'Experience') {
-        skyColor = 0xb7410e; groundColor = 0xc1440e; fogDensity = 0.015; biome = 'desert';
+        skyColor = 0xb7410e; groundColor = 0xc1440e; fogDensity = 0.028; biome = 'desert';
     } else if (name === 'Skills') {
-        skyColor = 0x87CEEB; groundColor = 0x228b22; fogDensity = 0.005; biome = 'forest';
+        skyColor = 0x2d6a2d; groundColor = 0x228b22; fogDensity = 0.018; biome = 'forest';
     } else if (name === 'Projects') {
-        skyColor = 0x2e004f; groundColor = 0x4a0e4e; fogDensity = 0.015; biome = 'alien';
+        skyColor = 0x1a0033; groundColor = 0x4a0e4e; fogDensity = 0.022; biome = 'alien';
     } else {
-        skyColor = 0xd4f1f9; groundColor = 0xffffff; fogDensity = 0.008; biome = 'ice';
+        skyColor = 0xc8eaf5; groundColor = 0xddeeff; fogDensity = 0.020; biome = 'ice';
     }
 
-    // Remove scene.background so the starry sky is visible!
-    scene.background = null; 
+    scene.background = new THREE.Color(skyColor);
     scene.fog = new THREE.FogExp2(skyColor, fogDensity);
 
-    // 1. Terrain
-    const groundGeo = new THREE.PlaneGeometry(1000, 1000, 100, 100);
+    // 1. Terrain — smaller tile (fog hides edges), world-wrap boundary keeps it infinite-feeling
+    // TERRAIN_HALF must match WRAP constant in updateRoverMovement
+    const TERRAIN_SIZE = 600;
+    const groundGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, 80, 80);
     const pos = groundGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
@@ -991,15 +1233,14 @@ function createSurfaceEnvironment(planetData) {
         const dist = Math.sqrt(x*x + y*y);
         let height = 0;
         
-        // Create a clear, flat driving path down the center z-axis
-        const isPath = Math.abs(x) < 30; 
+        // Flat path down the center Z-axis for rover
+        const isPath = Math.abs(x) < 30;
         
-        if (dist > 50 && !isPath) {
-            // Mildly bumpy terrain
+        if (dist > 40 && !isPath) {
             if (biome === 'forest') height = Math.sin(x/30)*5 + Math.cos(y/30)*5;
-            else if (biome === 'desert') height = Math.sin(x/20)*6 + Math.cos(y/20)*6 + Math.random()*1;
+            else if (biome === 'desert') height = Math.sin(x/20)*6 + Math.cos(y/20)*6 + (Math.random()-0.5)*1.5;
             else if (biome === 'alien') height = Math.abs(Math.sin(x/15)*10) + Math.cos(y/15)*5;
-            else height = (Math.random() * 1) + Math.sin(x/40)*2; // ice
+            else height = (Math.random() * 0.8) + Math.sin(x/40)*2; // ice
         }
         pos.setZ(i, height);
     }
@@ -1014,8 +1255,7 @@ function createSurfaceEnvironment(planetData) {
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     roverScene.add(ground);
-    
-    // Store ground for raycasting physics later
+
     roverScene.userData.ground = ground;
     roverScene.userData.biome = biome;
 
@@ -1086,6 +1326,37 @@ function createSurfaceEnvironment(planetData) {
         }
     }
     roverScene.add(instancedMesh);
+
+    // Ambient Particles
+    const particleCount = 500;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+        particlePos[i*3] = (Math.random() - 0.5) * 400; // x
+        particlePos[i*3+1] = Math.random() * 60; // y
+        particlePos[i*3+2] = (Math.random() - 0.5) * 400; // z
+    }
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+    
+    let particleColor = 0xffffff;
+    let particleSize = 1;
+    if (biome === 'ice') { particleColor = 0xffffff; particleSize = 1.5; }
+    else if (biome === 'desert') { particleColor = 0xdab894; particleSize = 2; }
+    else if (biome === 'forest') { particleColor = 0xaaffaa; particleSize = 1.5; }
+    else if (biome === 'alien') { particleColor = 0xd400ff; particleSize = 2; }
+    
+    const particleMat = new THREE.PointsMaterial({
+        color: particleColor,
+        size: particleSize,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    
+    surfaceParticles = new THREE.Points(particleGeo, particleMat);
+    roverScene.add(surfaceParticles);
+    surfaceParticleTime = 0;
 
     // 2. Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -1204,50 +1475,163 @@ function createSurfaceEnvironment(planetData) {
     rover.position.set(0, 0, 0);
     roverScene.add(rover);
 
-    // 4. Billboards (Experiences)
+    // Kiosks array for interaction
+    roverScene.userData.kiosks = [];
+
+    // Central Hub Landmark
+    let hubGeo, hubMat;
+    if (biome === 'desert') {
+        hubGeo = new THREE.TetrahedronGeometry(40, 0); // Pyramid-like
+        hubMat = new THREE.MeshStandardMaterial({color: 0xffaa00, metalness: 0.5, roughness: 0.8, flatShading: true});
+    } else if (biome === 'forest') {
+        hubGeo = new THREE.IcosahedronGeometry(35, 2); // Dome-like
+        hubMat = new THREE.MeshStandardMaterial({color: 0x11ff44, wireframe: true, emissive: 0x003300});
+    } else if (biome === 'alien') {
+        hubGeo = new THREE.ConeGeometry(15, 80, 4); // Spire
+        hubMat = new THREE.MeshStandardMaterial({color: 0xaa00ff, metalness: 0.8, roughness: 0.1, flatShading: true});
+    } else { // ice
+        hubGeo = new THREE.OctahedronGeometry(30, 0);
+        hubMat = new THREE.MeshStandardMaterial({color: 0xffffff, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.8});
+    }
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    hub.position.set(0, 20, 60); // Placed behind the rover start position
+    roverScene.add(hub);
+
+    // 4. Billboards (Experiences) — with text wrapping for long descriptions
     if (planetData.billboards) {
         let zPos = -30;
         planetData.billboards.forEach((board, index) => {
             const canvas = document.createElement('canvas');
             canvas.width = 512;
-            canvas.height = 256;
+            canvas.height = 320; // Taller for wrapped text
             const ctx = canvas.getContext('2d');
-            
-            // Draw background
-            ctx.fillStyle = 'rgba(0, 20, 15, 0.8)';
-            ctx.fillRect(0, 0, 512, 256);
+
+            // Background with rounded feel
+            ctx.fillStyle = 'rgba(0, 10, 8, 0.92)';
+            ctx.fillRect(0, 0, 512, 320);
             ctx.strokeStyle = '#00ff88';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, 512, 256);
-            
-            // Draw text
+            ctx.lineWidth = 6;
+            ctx.strokeRect(3, 3, 506, 314);
+
+            // Title
             ctx.fillStyle = '#00ff88';
-            ctx.font = 'bold 40px "Orbitron", sans-serif';
+            ctx.font = 'bold 36px "Orbitron", sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(board.title, 256, 100);
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '24px "Inter", sans-serif';
-            ctx.fillText(board.desc, 256, 160);
+            ctx.fillText(board.title, 256, 80);
+
+            // Separator line
+            ctx.strokeStyle = 'rgba(0,255,136,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(40, 105); ctx.lineTo(472, 105);
+            ctx.stroke();
+
+            // Description or Data Viz
+            if (planetData.name === 'Skills') {
+                // Render simple Bar Chart instead of text
+                ctx.fillStyle = 'rgba(255,255,255,0.88)';
+                ctx.font = '20px "Inter", sans-serif';
+                ctx.fillText('Proficiency Metrics', 256, 140);
+                
+                // Draw 3 dummy bars based on string length hash for variety
+                const seed = board.desc.length;
+                const colors = ['#ff0055', '#00ddff', '#ffdd00'];
+                for (let b = 0; b < 3; b++) {
+                    const val = 0.4 + (Math.sin(seed + b * 2) * 0.5 + 0.5) * 0.5; // 0.4 to 0.9
+                    const yOff = 180 + b * 35;
+                    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                    ctx.fillRect(80, yOff, 350, 20);
+                    ctx.fillStyle = colors[b];
+                    ctx.fillRect(80, yOff, 350 * val, 20);
+                }
+            } else {
+                // Standard text wrap
+                ctx.fillStyle = 'rgba(255,255,255,0.88)';
+                ctx.font = '22px "Inter", sans-serif';
+                const words = board.desc.split(' ');
+                let line = '';
+                let lineY = 150;
+                const maxWidth = 440;
+                words.forEach((word, wi) => {
+                    const testLine = line + (line ? ' ' : '') + word;
+                    if (ctx.measureText(testLine).width > maxWidth && line) {
+                        ctx.fillText(line, 256, lineY);
+                        line = word;
+                        lineY += 32;
+                    } else {
+                        line = testLine;
+                    }
+                    if (wi === words.length - 1) ctx.fillText(line, 256, lineY);
+                });
+            }
 
             const tex = new THREE.CanvasTexture(canvas);
-            const planeGeo = new THREE.PlaneGeometry(16, 8);
+            const planeGeo = new THREE.PlaneGeometry(18, 11); // Taller billboard
             const planeMat = new THREE.MeshBasicMaterial({map: tex, transparent: true, side: THREE.DoubleSide});
             const mesh = new THREE.Mesh(planeGeo, planeMat);
-            
-            mesh.position.set((index % 2 === 0 ? 15 : -15), 5, zPos);
-            // Angle slightly towards the path
-            mesh.rotation.y = (index % 2 === 0 ? -Math.PI/6 : Math.PI/6);
-            
+
+            const isLeft = index % 2 !== 0; // Wait, index % 2 === 0 was x=18
+            const bx = isLeft ? -18 : 18;
+            mesh.position.set(bx, 7, zPos);
+            mesh.rotation.y = isLeft ? Math.PI/6 : -Math.PI/6;
+
             roverScene.add(mesh);
-            zPos -= 50; // Space them out along the path
+
+            // Create Kiosk for interaction
+            const kioskGeo = new THREE.BoxGeometry(2, 4, 2);
+            const kioskMat = new THREE.MeshStandardMaterial({color: 0x333333, metalness: 0.8});
+            const kiosk = new THREE.Mesh(kioskGeo, kioskMat);
+            // Emissive screen on kiosk
+            const screenGeo = new THREE.PlaneGeometry(1.5, 1.2);
+            const screenMat = new THREE.MeshBasicMaterial({color: 0x00ff88});
+            const screen = new THREE.Mesh(screenGeo, screenMat);
+            screen.position.set(0, 1, 1.01);
+            kiosk.add(screen);
+            
+            // Place kiosk closer to the path
+            const kx = isLeft ? -8 : 8;
+            kiosk.position.set(kx, 2, zPos + 5);
+            kiosk.rotation.y = isLeft ? Math.PI/4 : -Math.PI/4;
+            kiosk.userData.board = board;
+            roverScene.add(kiosk);
+            roverScene.userData.kiosks.push(kiosk);
+
+            zPos -= 55;
         });
 
-        // 5. Launch Pad at the end of the path
+        // 5. Launch Pad at end of path — with pulsing PointLight + LAUNCH label
         const padGeo = new THREE.CylinderGeometry(10, 10, 1, 32);
-        const padMat = new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x005522});
+        const padMat = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            emissive: 0x003311,
+            emissiveIntensity: 0.6
+        });
         launchPad = new THREE.Mesh(padGeo, padMat);
         launchPad.position.set(0, 0.5, zPos);
+
+        // Pulsing point light above pad
+        const padLight = new THREE.PointLight(0x00ff88, 2.5, 60);
+        padLight.position.set(0, 20, 0);
+        launchPad.userData.light = padLight;
+        launchPad.add(padLight);
+
+        // LAUNCH label above pad
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 256; labelCanvas.height = 128;
+        const lctx = labelCanvas.getContext('2d');
+        lctx.fillStyle = '#00ff88';
+        lctx.font = 'bold 48px "Orbitron", sans-serif';
+        lctx.textAlign = 'center';
+        lctx.textBaseline = 'middle';
+        lctx.fillText('[ LAUNCH ]', 128, 64);
+        const labelTex = new THREE.CanvasTexture(labelCanvas);
+        const labelMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(16, 8),
+            new THREE.MeshBasicMaterial({map: labelTex, transparent: true, side: THREE.DoubleSide, depthTest: false})
+        );
+        labelMesh.position.set(0, 28, 0);
+        launchPad.add(labelMesh);
+
         roverScene.add(launchPad);
     }
 }
@@ -1260,117 +1644,199 @@ function initiateLanding(planet) {
     if (isRoverMode) return;
     isRoverMode = true;
     currentPlanetData = planet.userData;
-    
+
     // Stop spaceship movement
     controls.forward = false;
     controls.backward = false;
-    
-    // Trigger White-out
-    const overlay = document.getElementById('landing-overlay');
-    overlay.style.opacity = '1';
-    
-    setTimeout(() => {
-        // Hide solar system
-        starSystems.forEach(system => system.group.visible = false);
-        
-        // Show rover scene
-        roverScene.visible = true;
-        
-        // Generate surface
-        createSurfaceEnvironment(currentPlanetData);
-        
-        // Hide UI elements
-        document.getElementById('planetInfoCard').classList.remove('active');
-        document.querySelector('.view-toggle').style.display = 'none';
-        
-        // Add Return Button dynamically
-        let btn = document.getElementById('return-orbit-btn');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.id = 'return-orbit-btn';
-            btn.className = 'btn btn-primary';
-            btn.style.position = 'fixed';
-            btn.style.bottom = '20px';
-            btn.style.left = '50%';
-            btn.style.transform = 'translateX(-50%)';
-            btn.style.zIndex = '1000';
-            btn.textContent = 'Return to Orbit';
-            btn.onclick = returnToOrbit;
-            document.body.appendChild(btn);
-        }
-        btn.style.display = 'block';
+    document.getElementById('planetInfoCard').classList.remove('active');
 
-        // Add Driving Instructions dynamically
-        let instructions = document.getElementById('rover-instructions');
-        if (!instructions) {
-            instructions = document.createElement('div');
-            instructions.id = 'rover-instructions';
-            instructions.style.position = 'fixed';
-            instructions.style.bottom = '80px';
-            instructions.style.left = '50%';
-            instructions.style.transform = 'translateX(-50%)';
-            instructions.style.zIndex = '1000';
-            instructions.style.color = '#00ff88';
-            instructions.style.fontFamily = '"Orbitron", sans-serif';
-            instructions.style.fontSize = '1.2rem';
-            instructions.style.textShadow = '0 0 10px rgba(0, 255, 136, 0.8)';
-            instructions.style.pointerEvents = 'none';
-            instructions.innerHTML = 'W: Accelerate | S: Brake/Reverse | A/D: Steer';
-            document.body.appendChild(instructions);
+    // --- Cinematic Descent ---
+    // Phase 1 (0-1.5s): Camera zooms toward planet surface
+    const targetPos = new THREE.Vector3();
+    planet.getWorldPosition(targetPos);
+    const descentStart = camera3D.position.clone();
+    // Aim slightly above the planet surface
+    const descentEnd = targetPos.clone().add(new THREE.Vector3(0, (planet.userData.size || 15) * 2.5, 0));
+    const descentDuration = 1500;
+    const descentStartTime = performance.now();
+
+    function descentStep(now) {
+        const t = Math.min(1, (now - descentStartTime) / descentDuration);
+        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out
+        camera3D.position.lerpVectors(descentStart, descentEnd, ease);
+        camera3D.lookAt(targetPos);
+        renderer.render(scene, camera3D);
+        if (t < 1) {
+            requestAnimationFrame(descentStep);
+        } else {
+            // Phase 2 (1.5-2.5s): Atmosphere flash to white
+            const overlay = document.getElementById('landing-overlay');
+            overlay.style.transition = 'opacity 1s ease';
+            overlay.style.opacity = '1';
+            setTimeout(showSurface, 1000);
         }
-        instructions.style.display = 'block';
+    }
+    requestAnimationFrame(descentStep);
+
+    function showSurface() {
+        // Hide solar system, show rover scene
+        starSystems.forEach(system => system.group.visible = false);
+        roverScene.visible = true;
+        createSurfaceEnvironment(currentPlanetData);
+
+        // Reset rover starting position, rotation, velocity and mouse-look state
+        if (rover) { 
+            rover.position.set(0, 0, 0); 
+            rover.rotation.y = 0;
+        }
+        roverVelocity = 0;
+        roverLookYaw = 0;
+        roverLookPitch = 0;
+
+        // Show rover HUD
+        document.querySelector('.view-toggle').style.display = 'none';
+        const roverHud = document.getElementById('rover-hud');
+        if (roverHud) {
+            roverHud.style.display = 'flex';
+            const biomeEl = document.getElementById('rover-biome');
+            if (biomeEl) biomeEl.textContent = roverScene.userData.biome?.toUpperCase() || '---';
+        }
+
+        // Web Audio Ambient Drone
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         
-        // Fade back in
+        if (droneOsc) droneOsc.stop();
+        droneOsc = audioCtx.createOscillator();
+        droneGain = audioCtx.createGain();
+        droneFilter = audioCtx.createBiquadFilter();
+
+        droneOsc.connect(droneFilter);
+        droneFilter.connect(droneGain);
+        droneGain.connect(audioCtx.destination);
+
+        const biome = roverScene.userData.biome;
+        if (biome === 'desert') {
+            droneOsc.type = 'triangle'; droneOsc.frequency.value = 60;
+            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 200;
+        } else if (biome === 'ice') {
+            droneOsc.type = 'sine'; droneOsc.frequency.value = 300;
+            droneFilter.type = 'bandpass'; droneFilter.frequency.value = 800;
+        } else if (biome === 'forest') {
+            droneOsc.type = 'sine'; droneOsc.frequency.value = 150;
+            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 400;
+        } else if (biome === 'alien') {
+            droneOsc.type = 'sawtooth'; droneOsc.frequency.value = 80;
+            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 300;
+        }
+
+        droneGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        droneGain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 2);
+        droneOsc.start();
+
+        // Fade-in from white
+        const overlay = document.getElementById('landing-overlay');
+        overlay.style.transition = 'opacity 1.2s ease';
         overlay.style.opacity = '0';
-    }, 2000); // 2 second white-out
+    }
 }
 
+// Guard to prevent double-launch
+let isLaunching = false;
+
 function returnToOrbit() {
-    if (!isRoverMode) return;
-    
-    // Trigger White-out
-    const overlay = document.getElementById('landing-overlay');
-    overlay.style.opacity = '1';
-    
-    setTimeout(() => {
+    if (!isRoverMode || isLaunching) return;
+    isLaunching = true;
+
+    // Fade out drone
+    if (droneGain && audioCtx) {
+        droneGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+        setTimeout(() => { if (droneOsc) { droneOsc.stop(); droneOsc = null; } }, 1500);
+    }
+
+    // --- Cinematic Launch Sequence ---
+    // Phase 1 (0-1.2s): Camera tilts upward dramatically
+    const launchStartQuat = camera3D.quaternion.clone();
+    const lookUpVec = new THREE.Vector3(0, 1, -0.3).normalize();
+    const launchEndQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), lookUpVec);
+    const tiltDuration = 1200;
+    const tiltStartTime = performance.now();
+
+    function tiltStep(now) {
+        const t = Math.min(1, (now - tiltStartTime) / tiltDuration);
+        const ease = t * t; // ease-in
+        camera3D.quaternion.slerpQuaternions(launchStartQuat, launchEndQuat, ease);
+        // Drift camera upward slightly
+        camera3D.position.y += 0.3 * ease;
+        renderer.render(scene, camera3D);
+        if (t < 1) {
+            requestAnimationFrame(tiltStep);
+        } else {
+            // Phase 2 (1.2-2.2s): Fog ramps to white-out
+            atmosphericWhiteout();
+        }
+    }
+    requestAnimationFrame(tiltStep);
+
+    function atmosphericWhiteout() {
+        const overlay = document.getElementById('landing-overlay');
+        overlay.style.transition = 'opacity 1s ease';
+        overlay.style.opacity = '1';
+        setTimeout(showOrbit, 1000);
+    }
+
+    function showOrbit() {
         isRoverMode = false;
+        isLaunching = false;
         roverScene.visible = false;
-        
-        // Reset environment
+
+        // Restore space environment
         scene.background = null;
         scene.fog = new THREE.FogExp2(0x000000, 0.0005);
-        
+
         // Show solar system
         starSystems.forEach(system => system.group.visible = true);
-        
-        // Reset camera position slightly back from the planet to avoid re-triggering
-        if (currentPlanetData && currentPlanetData.planet) {
-            const worldPos = new THREE.Vector3();
-            currentPlanetData.planet.getWorldPosition(worldPos);
-            // Move camera away from the planet towards the center
-            const dir = worldPos.clone().normalize().negate();
-            camera3D.position.copy(worldPos).add(dir.multiplyScalar(40));
-            camera3D.lookAt(0,0,0);
+
+        // Position camera back at a safe distance from where we landed
+        if (currentPlanetData) {
+            // Find the planet group still in the scene
+            let planetGroup = null;
+            starSystems.forEach(sys => {
+                sys.planets.forEach(p => {
+                    if (p.userData.name === currentPlanetData.name) planetGroup = p;
+                });
+            });
+            if (planetGroup) {
+                const worldPos = new THREE.Vector3();
+                planetGroup.getWorldPosition(worldPos);
+                const dir = worldPos.clone().normalize().negate();
+                camera3D.position.copy(worldPos).add(dir.multiplyScalar(60));
+                camera3D.lookAt(0, 0, 0);
+            }
         }
-        
-        // Show UI elements
+
+        // Hide rover HUD, show view toggle
         document.querySelector('.view-toggle').style.display = 'flex';
-        const btn = document.getElementById('return-orbit-btn');
-        if (btn) btn.style.display = 'none';
-        
-        const instructions = document.getElementById('rover-instructions');
-        if (instructions) instructions.style.display = 'none';
-        
-        // Clear old surface to save memory
-        while(roverScene.children.length > 0){ 
-            roverScene.remove(roverScene.children[0]); 
+        const roverHud = document.getElementById('rover-hud');
+        if (roverHud) roverHud.style.display = 'none';
+        const approachEl = document.getElementById('planet-approach-hud');
+        if (approachEl) approachEl.classList.remove('visible');
+
+        // Clear surface to free memory
+        while (roverScene.children.length > 0) {
+            roverScene.remove(roverScene.children[0]);
         }
         rover = null;
         launchPad = null;
-        
-        // Fade back in
+        launchPadPulseTime = 0;
+
+        // Phase 3 (pull back from planet over 1s while fading in)
+        const overlay = document.getElementById('landing-overlay');
+        overlay.style.transition = 'opacity 1.2s ease';
         overlay.style.opacity = '0';
-    }, 2000);
+    }
 }
 
 // ========================================
