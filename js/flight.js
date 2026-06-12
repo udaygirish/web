@@ -31,6 +31,34 @@ function startFlight() {
     createWarpLines();
     isTransitioning = false;
     showCockpitBezel();
+
+    // Show direction beacon — fades out on first movement
+    const beacon = document.getElementById('direction-beacon');
+    if (beacon) {
+        beacon.classList.remove('hidden');
+        // Auto-dismiss after 8 seconds even if no movement
+        setTimeout(() => {
+            if (beacon && !beacon.classList.contains('hidden')) {
+                dismissBeacon();
+            }
+        }, 8000);
+    }
+
+    // Open-space entry console message
+    if (typeof writeToConsole === 'function') {
+        setTimeout(() => {
+            writeToConsole("NAV SYSTEMS ONLINE. 5 WORMHOLE SIGNATURES DETECTED.");
+            setTimeout(() => writeToConsole("LEFT: PERSONAL | RIGHT: WORK | BELOW: BLOG | ABOVE: WORLD VIEW | AHEAD: RESEARCH"), 1800);
+        }, 600);
+    }
+}
+
+// Dismiss the direction beacon with a fade-out
+function dismissBeacon() {
+    const beacon = document.getElementById('direction-beacon');
+    if (!beacon || beacon.classList.contains('hidden')) return;
+    beacon.classList.add('fading-out');
+    setTimeout(() => beacon.classList.add('hidden'), 800);
 }
 
 function enterWormhole(wormhole) {

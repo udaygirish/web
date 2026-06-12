@@ -73,7 +73,19 @@ function simulateLoading() {
     // Start Matrix rain
     startMatrixRain();
 
-    let step = 0;
+    // Guard: skip can only fire once
+    let skipAllowed = false;
+    let skipFired = false;
+
+    function skipLoading() {
+        if (!skipAllowed || skipFired) return;
+        skipFired = true;
+        completeLoading();
+    }
+
+    // Attach skip listeners — keydown or click anywhere
+    document.addEventListener('keydown', skipLoading, { once: true });
+    document.addEventListener('click', skipLoading, { once: true });
 
     // Step 1: Show blinking cursor with Matrix rain
     function showCursor() {
@@ -82,11 +94,22 @@ function simulateLoading() {
         cursorLine.innerHTML = '<span class="cursor-block"></span>';
         terminalOutput.appendChild(cursorLine);
 
-        setTimeout(executeScript, 2000); // Let Matrix rain for 2 seconds
+        // Show skip hint bottom-right after cursor appears
+        const skipHint = document.createElement('div');
+        skipHint.id = 'skip-hint';
+        skipHint.textContent = 'PRESS ANY KEY TO SKIP';
+        skipHint.style.cssText = 'position:fixed;bottom:20px;right:20px;color:rgba(0,255,0,0.45);font-family:"Courier New",monospace;font-size:0.75rem;letter-spacing:2px;pointer-events:none;z-index:5;animation:blink-hint 1.5s infinite;';
+        document.body.appendChild(skipHint);
+
+        setTimeout(() => {
+            skipAllowed = true;  // Allow skip once cursor has shown
+            executeScript();
+        }, 2000); // Let Matrix rain for 2 seconds
     }
 
     // Step 2: Execute create_world.sh
     function executeScript() {
+        if (skipFired) return;
         terminalOutput.innerHTML = '';
 
         const promptLine = document.createElement('div');
@@ -186,7 +209,7 @@ function simulateLoading() {
 
             updateProgress(percent);
 
-            if (elapsed >= duration) {
+            if (elapsed >= duration || skipFired) {
                 progressContainer.remove(); // Remove progress circle when done
                 completeLoading();
                 return;
@@ -256,6 +279,13 @@ function simulateLoading() {
 
     // Step 4: Complete and launch
     function completeLoading() {
+        // Remove skip hint
+        const skipHint = document.getElementById('skip-hint');
+        if (skipHint) skipHint.remove();
+        // Remove skip listeners in case they haven't fired yet
+        document.removeEventListener('keydown', skipLoading);
+        document.removeEventListener('click', skipLoading);
+
         const completeLine = document.createElement('div');
         completeLine.className = 'terminal-line command';
         completeLine.textContent = '\n[WORLD INITIALIZED]\n';
