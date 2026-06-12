@@ -858,15 +858,17 @@ function onKeyDown(event) {
                 break;
         }
 
-        // Shift for speed boost
+        // Shift = speed boost only (not forced moveDown — that was a bug)
         if (event.shiftKey) {
             speedBoost = true;
-            moveDown = true;
         }
 
         // Light up the matching cockpit key indicator
         setCockpitKey(key, true);
         if (event.shiftKey) setCockpitKey('shift', true);
+
+        // Dismiss the direction beacon on first movement key
+        if (typeof dismissBeacon === 'function') dismissBeacon();
     }
 }
 
@@ -896,10 +898,9 @@ function onKeyUp(event) {
             break;
     }
 
-    // Reset speed boost and down when Shift is released
+    // Reset speed boost when Shift is released
     if (!event.shiftKey) {
         speedBoost = false;
-        moveDown = false;
     }
 
     // Extinguish the cockpit key indicator

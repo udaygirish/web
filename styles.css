@@ -305,6 +305,11 @@ body {
     }
 }
 
+@keyframes blink-hint {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.15; }
+}
+
 /* Scrollbar for terminal */
 .terminal-fullscreen::-webkit-scrollbar {
     width: 10px;
@@ -2047,5 +2052,107 @@ html {
     .hud-toggle-btn {
         display: none;
     }
+}
+
+/* ========================================
+   Direction Beacon — First Open Space Entry
+   ======================================== */
+
+#direction-beacon {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: beacon-fade-in 1s ease forwards;
+    transition: opacity 0.8s ease;
+}
+
+#direction-beacon.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+#direction-beacon.fading-out {
+    opacity: 0;
+}
+
+@keyframes beacon-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.beacon-ring {
+    position: absolute;
+    width: 300px; height: 300px;
+    border: 2px solid rgba(0, 255, 136, 0.2);
+    border-radius: 50%;
+    animation: beacon-ring-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes beacon-ring-pulse {
+    0%, 100% { transform: scale(1);   opacity: 0.25; }
+    50%       { transform: scale(1.08); opacity: 0.55; }
+}
+
+.beacon-arrows {
+    position: relative;
+    width: 280px; height: 280px;
+}
+
+.beacon-arrow {
+    position: absolute;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(0, 255, 136, 0.85);
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.7);
+    text-align: center;
+    animation: arrow-pulse 2s ease-in-out infinite;
+}
+
+.beacon-arrow span {
+    display: block;
+    font-size: 0.6rem;
+    opacity: 0.8;
+}
+
+@keyframes arrow-pulse {
+    0%, 100% { opacity: 0.7; }
+    50%       { opacity: 1;   }
+}
+
+.beacon-left  { left: -40px; top: 50%; transform: translateY(-50%); color: rgba(0,255,136,0.9); }
+.beacon-right { right: -40px; top: 50%; transform: translateY(-50%); color: rgba(6,255,165,0.9); }
+.beacon-up    { top: -55px; left: 50%; transform: translateX(-50%); color: rgba(76,201,240,0.9); }
+.beacon-down  { bottom: -60px; left: 50%; transform: translateX(-50%); color: rgba(255,107,53,0.9); }
+.beacon-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    text-align: center;
+    color: rgba(157,78,221,0.9);
+    text-shadow: 0 0 20px rgba(157,78,221,0.7);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    line-height: 1.4;
+}
+
+.beacon-label {
+    position: absolute;
+    bottom: calc(50% - 180px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: rgba(0, 255, 136, 0.5);
+    white-space: nowrap;
+    animation: arrow-pulse 3s ease-in-out infinite;
 }
 
