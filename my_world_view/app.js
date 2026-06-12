@@ -26,6 +26,7 @@ const starSystems = [];
 
 // Rover Mode State
 let isRoverMode = false;
+let isLandingAnim = false;
 let roverScene = new THREE.Group(); // Holds the planet surface and rover
 let rover = null;
 let currentPlanetData = null;
@@ -649,7 +650,7 @@ function animate() {
 // ========================================
 
 function updateRoverMovement() {
-    if (!rover) return;
+    if (!rover || isLandingAnim) return;
 
     const biome = roverScene.userData.biome;
     const ground = roverScene.userData.ground;
@@ -726,13 +727,30 @@ function updateRoverMovement() {
         }
     }
 
-    // Seamless world-wrap — fog hides the jump completely.
-    // WRAP radius should be <= TERRAIN_SIZE/2 - margin.
-    const WRAP = 270;
-    if (rover.position.x >  WRAP) rover.position.x -= WRAP * 2;
-    if (rover.position.x < -WRAP) rover.position.x += WRAP * 2;
-    if (rover.position.z >  WRAP) rover.position.z -= WRAP * 2;
-    if (rover.position.z < -WRAP) rover.position.z += WRAP * 2;
+    // Boundary check: Warn and return to base if wandering too far
+    const distFromBase = Math.sqrt(rover.position.x**2 + rover.position.z**2);
+    const warnEl = document.getElementById('boundary-warning');
+    if (distFromBase > 350 && distFromBase <= 400) {
+        if (warnEl) warnEl.style.display = 'block';
+    } else if (distFromBase > 400) {
+        // Teleport back
+        rover.position.set(0, 0, 0);
+        rover.rotation.y = 0;
+        roverLookYaw = 0;
+        roverLookPitch = 0;
+        if (warnEl) warnEl.style.display = 'none';
+        
+        // Brief white flash
+        const overlay = document.getElementById('landing-overlay');
+        overlay.style.transition = 'none';
+        overlay.style.opacity = '1';
+        setTimeout(() => {
+            overlay.style.transition = 'opacity 1s ease';
+            overlay.style.opacity = '0';
+        }, 50);
+    } else {
+        if (warnEl) warnEl.style.display = 'none';
+    }
 
     // Chase Camera with mouse-look yaw/pitch offset
     const baseOffset = new THREE.Vector3(0, 12, 30);
@@ -775,6 +793,13 @@ function updateRoverMovement() {
             currentInteractiveKioskBoard = null;
             if (hintEl) hintEl.style.display = 'none';
         }
+    }
+
+    // Animate Rocky's glowing communication orb if it exists
+    if (roverScene.userData.rockyOrb) {
+        roverScene.userData.rockyOrb.position.y = 4 + Math.sin(performance.now() * 0.005) * 0.5;
+        // Pulse light intensity
+        roverScene.userData.rockyLight.intensity = 1 + Math.sin(performance.now() * 0.01) * 0.5;
     }
 }
 
@@ -1160,6 +1185,10 @@ function showSystemInfo(system) {
 
     document.getElementById('cardContent').innerHTML = contentHTML;
     document.getElementById('planetInfoCard').classList.add('active');
+    
+    // Hide landing button for system
+    const landBtn = document.getElementById('land-btn');
+    if (landBtn) landBtn.style.display = 'none';
 }
 
 function showPlanetInfo(planet) {
@@ -1187,15 +1216,18 @@ function showPlanetInfo(planet) {
         <ul>
             ${content.details.map(detail => `<li>${detail}</li>`).join('')}
         </ul>
-        <button id="land-btn" class="btn btn-primary" style="margin-top: 15px; width: 100%;">Initiate Landing</button>
     `;
 
     document.getElementById('cardContent').innerHTML = contentHTML;
     document.getElementById('planetInfoCard').classList.add('active');
     
-    document.getElementById('land-btn').onclick = () => {
-        initiateLanding(planet);
-    };
+    const landBtn = document.getElementById('land-btn');
+    if (landBtn) {
+        landBtn.style.display = 'block';
+        landBtn.onclick = () => {
+            initiateLanding(planet);
+        };
+    }
 }
 
 // ========================================
@@ -1366,57 +1398,91 @@ function createSurfaceEnvironment(planetData) {
     dirLight.position.set(100, 200, 50);
     roverScene.add(dirLight);
 
-    // 3. Rover Mesh
+    // 3. Rover Mesh (Upgraded Design)
     rover = new THREE.Group();
     
-    // Main Chassis
-    const chassisGeo = new THREE.BoxGeometry(4, 1.5, 8);
-    const chassisMat = new THREE.MeshStandardMaterial({color: 0xdddddd, metalness: 0.8, roughness: 0.2});
+    // Main Chassis Body
+    const chassisGeo = new THREE.BoxGeometry(4, 1.2, 7);
+    const chassisMat = new THREE.MeshStandardMaterial({
+        color: 0xcccccc, 
+        metalness: 0.7, 
+        roughness: 0.4
+    });
     const chassis = new THREE.Mesh(chassisGeo, chassisMat);
-    chassis.position.y = 1.5;
+    chassis.position.y = 1.8;
     rover.add(chassis);
 
-    // Cockpit Window
-    const cockpitGeo = new THREE.BoxGeometry(3, 1.2, 3);
-    const cockpitMat = new THREE.MeshStandardMaterial({color: 0x111111, metalness: 0.9, roughness: 0.1});
+    // Front Sloped Nose
+    const noseGeo = new THREE.CylinderGeometry(2, 2, 4, 3);
+    noseGeo.rotateZ(Math.PI / 2);
+    noseGeo.rotateX(Math.PI / 2);
+    const noseMat = new THREE.MeshStandardMaterial({color: 0xaaaaaa, metalness: 0.8, roughness: 0.3});
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.position.set(0, 1.8, -3.5);
+    rover.add(nose);
+
+    // Cockpit Window / Sensor block
+    const cockpitGeo = new THREE.BoxGeometry(2.5, 0.8, 2);
+    const cockpitMat = new THREE.MeshStandardMaterial({color: 0x050505, metalness: 1.0, roughness: 0.0});
     const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
-    cockpit.position.set(0, 2.5, -1);
+    cockpit.position.set(0, 2.8, -1.5);
     rover.add(cockpit);
 
-    // Solar Panel / Roof Rack
-    const panelGeo = new THREE.PlaneGeometry(3.5, 4);
-    const panelMat = new THREE.MeshStandardMaterial({color: 0x003366, metalness: 1.0, roughness: 0.2, side: THREE.DoubleSide});
-    const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.rotation.x = -Math.PI / 2;
-    panel.position.set(0, 2.3, 2);
-    rover.add(panel);
+    // Rear Cargo Deck / RTG Power Source
+    const rtgGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 16);
+    rtgGeo.rotateZ(Math.PI / 2);
+    const rtgMat = new THREE.MeshStandardMaterial({color: 0x444444, metalness: 0.9, roughness: 0.5});
+    const rtg = new THREE.Mesh(rtgGeo, rtgMat);
+    rtg.position.set(0, 2.8, 2);
+    rover.add(rtg);
+    
+    // RTG Fins
+    const finsGeo = new THREE.BoxGeometry(2, 2.2, 1.8);
+    const finsMat = new THREE.MeshStandardMaterial({color: 0x222222, metalness: 0.5, roughness: 0.8});
+    const fins = new THREE.Mesh(finsGeo, finsMat);
+    fins.position.set(0, 2.8, 2);
+    rover.add(fins);
 
-    // Antenna
-    const antennaGeo = new THREE.CylinderGeometry(0.05, 0.05, 3);
-    const antennaMat = new THREE.MeshStandardMaterial({color: 0x555555});
-    const antenna = new THREE.Mesh(antennaGeo, antennaMat);
-    antenna.position.set(1.5, 3.5, 3);
-    rover.add(antenna);
+    // Camera Mast
+    const mastGeo = new THREE.CylinderGeometry(0.1, 0.1, 2.5);
+    const mastMat = new THREE.MeshStandardMaterial({color: 0x888888});
+    const mast = new THREE.Mesh(mastGeo, mastMat);
+    mast.position.set(1.5, 3.5, -1.5);
+    rover.add(mast);
     
-    const bulbGeo = new THREE.SphereGeometry(0.2);
-    const bulbMat = new THREE.MeshBasicMaterial({color: 0xff0000});
-    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-    bulb.position.set(1.5, 5, 3);
-    rover.add(bulb);
-    
-    // Wheels with Hubcaps
+    // Camera Head (Stereo Cameras)
+    const headGeo = new THREE.BoxGeometry(0.8, 0.4, 0.4);
+    const headMat = new THREE.MeshStandardMaterial({color: 0xeeeeee});
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.set(1.5, 4.8, -1.5);
+    rover.add(head);
+
+    const lensGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.2);
+    lensGeo.rotateX(Math.PI / 2);
+    const lensMat = new THREE.MeshBasicMaterial({color: 0x00aaff});
+    const lens1 = new THREE.Mesh(lensGeo, lensMat);
+    lens1.position.set(1.2, 4.8, -1.7);
+    rover.add(lens1);
+    const lens2 = new THREE.Mesh(lensGeo, lensMat);
+    lens2.position.set(1.8, 4.8, -1.7);
+    rover.add(lens2);
+
+    // Wheels, Hubcaps, and Suspension Arms
     const wheelGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 24);
     wheelGeo.rotateZ(Math.PI/2);
-    const wheelMat = new THREE.MeshStandardMaterial({color: 0x222222, roughness: 0.9});
+    const wheelMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 1.0});
+    
     const hubcapGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.05, 12);
     hubcapGeo.rotateZ(Math.PI/2);
-    const hubcapMat = new THREE.MeshStandardMaterial({color: 0xaaaaaa, metalness: 0.9});
+    const hubcapMat = new THREE.MeshStandardMaterial({color: 0xd4af37, metalness: 1.0, roughness: 0.3}); // Gold accent hubcaps
     
+    const suspensionGeo = new THREE.CylinderGeometry(0.15, 0.15, 2.5);
+    const suspensionMat = new THREE.MeshStandardMaterial({color: 0x333333, metalness: 0.8});
+
     const wheelPositions = [
-        [-2.5, 1.2, 3], [2.5, 1.2, 3], [-2.5, 1.2, -3], [2.5, 1.2, -3]
+        [-3.2, 1.2, 3], [3.2, 1.2, 3], [-3.2, 1.2, -3], [3.2, 1.2, -3]
     ];
     
-    // To allow rotation animation, we can store wheels in an array
     rover.userData.wheels = [];
     
     wheelPositions.forEach(p => {
@@ -1431,6 +1497,14 @@ function createSurfaceEnvironment(planetData) {
         wheelGroup.position.set(...p);
         rover.add(wheelGroup);
         rover.userData.wheels.push(wheelGroup);
+
+        // Suspension Arm
+        const arm = new THREE.Mesh(suspensionGeo, suspensionMat);
+        // Connect arm from chassis side to wheel center
+        const isLeft = p[0] < 0;
+        arm.position.set(isLeft ? p[0] + 0.8 : p[0] - 0.8, 1.6, p[2]);
+        arm.rotation.z = isLeft ? Math.PI/4 : -Math.PI/4;
+        rover.add(arm);
     });
 
     // Dual Headlights
@@ -1489,6 +1563,53 @@ function createSurfaceEnvironment(planetData) {
     } else if (biome === 'alien') {
         hubGeo = new THREE.ConeGeometry(15, 80, 4); // Spire
         hubMat = new THREE.MeshStandardMaterial({color: 0xaa00ff, metalness: 0.8, roughness: 0.1, flatShading: true});
+        
+        // --- Rocky from Project Hail Mary (Easter Egg) ---
+        const rockyGroup = new THREE.Group();
+        // Carapace (pentagonal rough dome)
+        const carapaceGeo = new THREE.DodecahedronGeometry(2, 1);
+        const carapaceMat = new THREE.MeshStandardMaterial({
+            color: 0x554433,
+            roughness: 1.0,
+            bumpScale: 0.5
+        });
+        const carapace = new THREE.Mesh(carapaceGeo, carapaceMat);
+        carapace.position.y = 2.5;
+        rockyGroup.add(carapace);
+        
+        // 5 Legs radiating outwards
+        const legGeo = new THREE.CylinderGeometry(0.3, 0.1, 3.5);
+        const legMat = new THREE.MeshStandardMaterial({color: 0x443322, roughness: 0.9});
+        for (let i = 0; i < 5; i++) {
+            const leg = new THREE.Mesh(legGeo, legMat);
+            const angle = (i / 5) * Math.PI * 2;
+            leg.position.set(Math.cos(angle) * 1.5, 1.2, Math.sin(angle) * 1.5);
+            // Point the leg outward and downward
+            leg.lookAt(Math.cos(angle) * 4, -2, Math.sin(angle) * 4);
+            leg.rotateX(Math.PI / 2);
+            rockyGroup.add(leg);
+        }
+        
+        // Eridian musical communication orb (floating glowing sphere)
+        const orbGeo = new THREE.SphereGeometry(0.3, 16, 16);
+        const orbMat = new THREE.MeshBasicMaterial({color: 0x00ffff});
+        const orb = new THREE.Mesh(orbGeo, orbMat);
+        orb.position.set(2, 4, 2);
+        
+        // Add a small light to the orb
+        const orbLight = new THREE.PointLight(0x00ffff, 1.5, 15);
+        orbLight.position.set(2, 4, 2);
+        
+        rockyGroup.add(orb);
+        rockyGroup.add(orbLight);
+        
+        rockyGroup.position.set(20, 0, 50); // Near the hub
+        roverScene.add(rockyGroup);
+        
+        // References for animation
+        roverScene.userData.rockyOrb = orb;
+        roverScene.userData.rockyLight = orbLight;
+        // ------------------------------------------------
     } else { // ice
         hubGeo = new THREE.OctahedronGeometry(30, 0);
         hubMat = new THREE.MeshStandardMaterial({color: 0xffffff, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.8});
@@ -1599,21 +1720,44 @@ function createSurfaceEnvironment(planetData) {
             zPos -= 55;
         });
 
-        // 5. Launch Pad at end of path — with pulsing PointLight + LAUNCH label
-        const padGeo = new THREE.CylinderGeometry(10, 10, 1, 32);
+        // 5. Base Station at the center (0, 0, 0)
+        const baseGroup = new THREE.Group();
+        
+        // Main Platform
+        const padGeo = new THREE.CylinderGeometry(15, 18, 2, 8);
         const padMat = new THREE.MeshStandardMaterial({
-            color: 0x00ff88,
-            emissive: 0x003311,
-            emissiveIntensity: 0.6
+            color: 0x444444,
+            metalness: 0.8,
+            roughness: 0.5
         });
-        launchPad = new THREE.Mesh(padGeo, padMat);
-        launchPad.position.set(0, 0.5, zPos);
+        const platform = new THREE.Mesh(padGeo, padMat);
+        platform.position.set(0, 0.5, 0);
+        baseGroup.add(platform);
+
+        // Landing Ring Glow
+        const ringGeo = new THREE.RingGeometry(8, 9, 32);
+        const ringMat = new THREE.MeshBasicMaterial({color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.8});
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI/2;
+        ring.position.set(0, 1.6, 0);
+        baseGroup.add(ring);
+
+        // Support Struts
+        const strutGeo = new THREE.CylinderGeometry(0.5, 0.5, 10, 4);
+        const strutMat = new THREE.MeshStandardMaterial({color: 0x222222, metalness: 0.9});
+        for (let i = 0; i < 4; i++) {
+            const strut = new THREE.Mesh(strutGeo, strutMat);
+            const angle = (i / 4) * Math.PI * 2 + Math.PI/4;
+            strut.position.set(Math.cos(angle) * 12, 5, Math.sin(angle) * 12);
+            strut.lookAt(0, 10, 0);
+            baseGroup.add(strut);
+        }
 
         // Pulsing point light above pad
         const padLight = new THREE.PointLight(0x00ff88, 2.5, 60);
         padLight.position.set(0, 20, 0);
-        launchPad.userData.light = padLight;
-        launchPad.add(padLight);
+        baseGroup.userData.light = padLight;
+        baseGroup.add(padLight);
 
         // LAUNCH label above pad
         const labelCanvas = document.createElement('canvas');
@@ -1623,15 +1767,16 @@ function createSurfaceEnvironment(planetData) {
         lctx.font = 'bold 48px "Orbitron", sans-serif';
         lctx.textAlign = 'center';
         lctx.textBaseline = 'middle';
-        lctx.fillText('[ LAUNCH ]', 128, 64);
+        lctx.fillText('[ BASE STATION ]', 128, 64);
         const labelTex = new THREE.CanvasTexture(labelCanvas);
         const labelMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(16, 8),
+            new THREE.PlaneGeometry(24, 12),
             new THREE.MeshBasicMaterial({map: labelTex, transparent: true, side: THREE.DoubleSide, depthTest: false})
         );
         labelMesh.position.set(0, 28, 0);
-        launchPad.add(labelMesh);
+        baseGroup.add(labelMesh);
 
+        launchPad = baseGroup;
         roverScene.add(launchPad);
     }
 }
@@ -1736,10 +1881,84 @@ function initiateLanding(planet) {
         droneGain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 2);
         droneOsc.start();
 
-        // Fade-in from white
+        // Phase 3: Dropship Cinematic Landing
+        isLandingAnim = true;
+        
+        // Hide rover initially
+        rover.visible = false;
+        document.getElementById('rover-hud').style.display = 'none'; // hide HUD during anim
+
+        // Create Dropship
+        const dropshipGroup = new THREE.Group();
+        const hullGeo = new THREE.CylinderGeometry(2.5, 4, 10, 8);
+        const hullMat = new THREE.MeshStandardMaterial({color: 0x999999, metalness: 0.9, roughness: 0.3});
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        dropshipGroup.add(hull);
+
+        // Retro Thruster Flame
+        const flameGeo = new THREE.ConeGeometry(2, 6, 8);
+        const flameMat = new THREE.MeshBasicMaterial({color: 0xffaa00, transparent: true, opacity: 0.8});
+        const flame = new THREE.Mesh(flameGeo, flameMat);
+        flame.position.y = -7;
+        flame.rotation.x = Math.PI;
+        dropshipGroup.add(flame);
+
+        dropshipGroup.position.set(0, 150, 0); // Start high
+        roverScene.add(dropshipGroup);
+
+        // Start fading from white immediately
         const overlay = document.getElementById('landing-overlay');
-        overlay.style.transition = 'opacity 1.2s ease';
+        overlay.style.transition = 'opacity 0.5s ease';
         overlay.style.opacity = '0';
+
+        const dropStart = performance.now();
+        const dropDuration = 2500; // 2.5 seconds to land
+
+        function dropStep(now) {
+            const t = Math.min(1, (now - dropStart) / dropDuration);
+            const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+            
+            // Move dropship down
+            dropshipGroup.position.y = 150 - (148 * ease);
+            
+            // Flicker flame
+            flame.scale.setScalar(0.8 + Math.random() * 0.4);
+            
+            // Camera follows dropship down, looking slightly up at it
+            camera3D.position.set(20, dropshipGroup.position.y + 10, 30);
+            camera3D.lookAt(dropshipGroup.position);
+
+            renderer.render(scene, camera3D);
+
+            if (t < 1) {
+                requestAnimationFrame(dropStep);
+            } else {
+                // Landed! Screen shake
+                let shake = 10;
+                flame.visible = false; // cut engines
+                
+                function shakeStep() {
+                    if (shake > 0) {
+                        camera3D.position.x = 20 + (Math.random() - 0.5) * shake;
+                        camera3D.position.y = 12 + (Math.random() - 0.5) * shake;
+                        camera3D.position.z = 30 + (Math.random() - 0.5) * shake;
+                        shake -= 1;
+                        renderer.render(scene, camera3D);
+                        requestAnimationFrame(shakeStep);
+                    } else {
+                        // Reveal rover, hide dropship (could animate doors but simple fade is robust)
+                        roverScene.remove(dropshipGroup);
+                        rover.visible = true;
+                        document.getElementById('rover-hud').style.display = 'flex';
+                        isLandingAnim = false; // Unlock controls!
+                    }
+                }
+                shakeStep();
+            }
+        }
+        
+        // Slight delay before drop to let white screen clear
+        setTimeout(() => requestAnimationFrame(dropStep), 500);
     }
 }
 

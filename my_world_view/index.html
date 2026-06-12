@@ -113,7 +113,23 @@
         <div class="card-body" id="cardContent">
             <!-- Content will be inserted dynamically -->
         </div>
+        <div class="card-footer" style="padding-top:15px; margin-top:10px; border-top:1px solid rgba(0,255,136,0.2);">
+            <button id="land-btn" class="land-btn-primary" style="display:none;">INITIATE LANDING</button>
+        </div>
     </div>
+
+    <!-- Boundary Warning Overlay -->
+    <div id="boundary-warning" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); text-align:center; z-index:2000; pointer-events:none;">
+        <h1 style="color:#ff0033; font-family:'Orbitron', sans-serif; font-size:3rem; text-shadow: 0 0 20px #ff0000; margin:0; animation: flash 1s infinite;">WARNING</h1>
+        <p style="color:#ffaaaa; font-family:'Inter', sans-serif; font-size:1.2rem; background:rgba(255,0,0,0.2); padding:10px 20px; border-radius:5px; border:1px solid #ff0033;">LEAVING EXPLORATION ZONE. RETURN TO BASE.</p>
+    </div>
+
+    <style>
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
 
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
