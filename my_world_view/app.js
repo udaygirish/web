@@ -795,11 +795,19 @@ function updateRoverMovement() {
         }
     }
 
-    // Animate Rocky's glowing communication orb if it exists
+    // Animate aliens
+    const time = performance.now();
     if (roverScene.userData.rockyOrb) {
-        roverScene.userData.rockyOrb.position.y = 4 + Math.sin(performance.now() * 0.005) * 0.5;
-        // Pulse light intensity
-        roverScene.userData.rockyLight.intensity = 1 + Math.sin(performance.now() * 0.01) * 0.5;
+        roverScene.userData.rockyOrb.position.y = 11.5 + Math.sin(time * 0.005) * 0.5;
+        roverScene.userData.rockyLight.intensity = 1 + Math.sin(time * 0.01) * 0.5;
+    }
+    if (roverScene.userData.greenAlien) {
+        roverScene.userData.greenAlien.position.y = Math.abs(Math.sin(time * 0.005)); // Hopping
+    }
+    if (roverScene.userData.energyAlien) {
+        roverScene.userData.energyAlien.rotation.y += 0.02;
+        roverScene.userData.energyAlien.rotation.x += 0.01;
+        roverScene.userData.energyAlien.position.y = Math.sin(time * 0.003) * 1.5; // Floating
     }
 }
 
@@ -1552,29 +1560,25 @@ function createSurfaceEnvironment(planetData) {
     // Kiosks array for interaction
     roverScene.userData.kiosks = [];
 
-    // Central Hub Landmark
     let hubGeo, hubMat;
     if (biome === 'desert') {
         hubGeo = new THREE.TetrahedronGeometry(40, 0); // Pyramid-like
         hubMat = new THREE.MeshStandardMaterial({color: 0xffaa00, metalness: 0.5, roughness: 0.8, flatShading: true});
-    } else if (biome === 'forest') {
-        hubGeo = new THREE.IcosahedronGeometry(35, 2); // Dome-like
-        hubMat = new THREE.MeshStandardMaterial({color: 0x11ff44, wireframe: true, emissive: 0x003300});
-    } else if (biome === 'alien') {
-        hubGeo = new THREE.ConeGeometry(15, 80, 4); // Spire
-        hubMat = new THREE.MeshStandardMaterial({color: 0xaa00ff, metalness: 0.8, roughness: 0.1, flatShading: true});
         
-        // --- Rocky from Project Hail Mary (Easter Egg) ---
+        // --- Rocky from Project Hail Mary (Desert/Rocky Planet) ---
         const rockyGroup = new THREE.Group();
+        // Rocky Mountain Pedestal
+        const rockGeo = new THREE.DodecahedronGeometry(8, 1);
+        const rockMat = new THREE.MeshStandardMaterial({color: 0x886644, roughness: 1.0, flatShading: true});
+        const rock = new THREE.Mesh(rockGeo, rockMat);
+        rock.position.y = 2;
+        rockyGroup.add(rock);
+
         // Carapace (pentagonal rough dome)
         const carapaceGeo = new THREE.DodecahedronGeometry(2, 1);
-        const carapaceMat = new THREE.MeshStandardMaterial({
-            color: 0x554433,
-            roughness: 1.0,
-            bumpScale: 0.5
-        });
+        const carapaceMat = new THREE.MeshStandardMaterial({color: 0x554433, roughness: 1.0, bumpScale: 0.5});
         const carapace = new THREE.Mesh(carapaceGeo, carapaceMat);
-        carapace.position.y = 2.5;
+        carapace.position.y = 10;
         rockyGroup.add(carapace);
         
         // 5 Legs radiating outwards
@@ -1583,36 +1587,100 @@ function createSurfaceEnvironment(planetData) {
         for (let i = 0; i < 5; i++) {
             const leg = new THREE.Mesh(legGeo, legMat);
             const angle = (i / 5) * Math.PI * 2;
-            leg.position.set(Math.cos(angle) * 1.5, 1.2, Math.sin(angle) * 1.5);
-            // Point the leg outward and downward
-            leg.lookAt(Math.cos(angle) * 4, -2, Math.sin(angle) * 4);
+            leg.position.set(Math.cos(angle) * 1.5, 8.5, Math.sin(angle) * 1.5);
+            leg.lookAt(Math.cos(angle) * 4, 6, Math.sin(angle) * 4);
             leg.rotateX(Math.PI / 2);
             rockyGroup.add(leg);
         }
         
-        // Eridian musical communication orb (floating glowing sphere)
+        // Eridian musical communication orb
         const orbGeo = new THREE.SphereGeometry(0.3, 16, 16);
         const orbMat = new THREE.MeshBasicMaterial({color: 0x00ffff});
         const orb = new THREE.Mesh(orbGeo, orbMat);
-        orb.position.set(2, 4, 2);
+        orb.position.set(2, 11.5, 2);
         
-        // Add a small light to the orb
         const orbLight = new THREE.PointLight(0x00ffff, 1.5, 15);
-        orbLight.position.set(2, 4, 2);
-        
+        orbLight.position.set(2, 11.5, 2);
         rockyGroup.add(orb);
         rockyGroup.add(orbLight);
         
-        rockyGroup.position.set(20, 0, 50); // Near the hub
+        rockyGroup.position.set(25, 0, 50); // Near the hub
         roverScene.add(rockyGroup);
-        
-        // References for animation
         roverScene.userData.rockyOrb = orb;
         roverScene.userData.rockyLight = orbLight;
-        // ------------------------------------------------
+        
+    } else if (biome === 'forest') {
+        hubGeo = new THREE.IcosahedronGeometry(35, 2); // Dome-like
+        hubMat = new THREE.MeshStandardMaterial({color: 0x11ff44, wireframe: true, emissive: 0x003300});
+        
+        // --- Green Alien Sprite (Forest Planet) ---
+        const greenAlien = new THREE.Group();
+        const bodyGeo = new THREE.CapsuleGeometry(1, 2, 4, 8);
+        const bodyMat = new THREE.MeshStandardMaterial({color: 0x00ff00, roughness: 0.4});
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 2;
+        greenAlien.add(body);
+        
+        // Antenna
+        const antGeo = new THREE.CylinderGeometry(0.05, 0.05, 1);
+        const ant1 = new THREE.Mesh(antGeo, bodyMat);
+        ant1.position.set(-0.5, 3.5, 0);
+        ant1.rotation.z = Math.PI/6;
+        greenAlien.add(ant1);
+        const ant2 = new THREE.Mesh(antGeo, bodyMat);
+        ant2.position.set(0.5, 3.5, 0);
+        ant2.rotation.z = -Math.PI/6;
+        greenAlien.add(ant2);
+
+        greenAlien.position.set(15, 0, 45);
+        roverScene.add(greenAlien);
+        roverScene.userData.greenAlien = greenAlien;
+
+    } else if (biome === 'alien') {
+        hubGeo = new THREE.ConeGeometry(15, 80, 4); // Spire
+        hubMat = new THREE.MeshStandardMaterial({color: 0xaa00ff, metalness: 0.8, roughness: 0.1, flatShading: true});
+        
+        // --- Purple Energy Alien (Purple Planet) ---
+        const energyAlien = new THREE.Group();
+        const coreGeo = new THREE.OctahedronGeometry(1.5, 0);
+        const coreMat = new THREE.MeshStandardMaterial({color: 0xcc00ff, emissive: 0x5500aa, wireframe: true});
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.y = 4;
+        energyAlien.add(core);
+
+        const innerCoreGeo = new THREE.SphereGeometry(0.8, 8, 8);
+        const innerCoreMat = new THREE.MeshBasicMaterial({color: 0xffaaff});
+        const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+        innerCore.position.y = 4;
+        energyAlien.add(innerCore);
+
+        energyAlien.position.set(20, 0, 50);
+        roverScene.add(energyAlien);
+        roverScene.userData.energyAlien = energyAlien;
+
     } else { // ice
         hubGeo = new THREE.OctahedronGeometry(30, 0);
         hubMat = new THREE.MeshStandardMaterial({color: 0xffffff, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.8});
+        
+        // --- Ice Yeti (Ice Planet) ---
+        const yeti = new THREE.Group();
+        const yetiMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 1.0, flatShading: true});
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 2), yetiMat);
+        torso.position.y = 4;
+        yeti.add(torso);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), yetiMat);
+        head.position.y = 7;
+        yeti.add(head);
+        const armGeo = new THREE.BoxGeometry(1, 4, 1);
+        const lArm = new THREE.Mesh(armGeo, yetiMat);
+        lArm.position.set(-2.5, 4, 0);
+        yeti.add(lArm);
+        const rArm = new THREE.Mesh(armGeo, yetiMat);
+        rArm.position.set(2.5, 4, 0);
+        yeti.add(rArm);
+        
+        yeti.position.set(-20, 0, 50);
+        roverScene.add(yeti);
     }
     const hub = new THREE.Mesh(hubGeo, hubMat);
     hub.position.set(0, 20, 60); // Placed behind the rover start position
