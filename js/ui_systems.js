@@ -2,6 +2,23 @@
 // Animation Loop
 // ========================================
 
+// Idle Orbit Screensaver
+let lastActivityTime = Date.now();
+const IDLE_TIMEOUT_MS = 60000;
+let idleOrbitActive = false;
+
+function resetIdleTimer() {
+    lastActivityTime = Date.now();
+    if (idleOrbitActive) {
+        idleOrbitActive = false;
+        if (autopilotActive) disableAutopilot();
+        warpActive = false;
+        if (typeof playWarpSpoolSound === 'function') playWarpSpoolSound(false);
+        const notice = document.getElementById('idle-screensaver-notice');
+        if (notice) notice.classList.remove('visible');
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -67,6 +84,16 @@ function animate() {
                     hudReticle.material.opacity = 0.95;
                     hudReticle.rotation.z += 0.08;
                     
+                    // Show wormhole destination tooltip
+                    const tt = document.getElementById('wormhole-tooltip');
+                    const ttLabel = document.getElementById('wt-label');
+                    const ttSwatch = document.getElementById('wt-swatch');
+                    if (tt && nearest) {
+                        if (ttLabel) ttLabel.textContent = nearest.config.label.toUpperCase();
+                        if (ttSwatch) ttSwatch.style.background = '#' + nearest.color.toString(16).padStart(6, '0');
+                        tt.style.opacity = '1';
+                    }
+                    
                     if (!nearest.group.userData.lockAnnounced && currentScene === SCENES.OPEN_SPACE) {
                         nearest.group.userData.lockAnnounced = true;
                         playLockChirp();
@@ -75,7 +102,11 @@ function animate() {
                 }
             } else {
                 hudReticle.visible = false;
+                // Hide tooltip when no lock
+                const tt = document.getElementById('wormhole-tooltip');
+                if (tt) tt.style.opacity = '0';
             }
+
         }
         
         // Update physics of crystal debris particles
@@ -183,6 +214,24 @@ function animate() {
         
         if (typeof updateRadar === 'function') {
             updateRadar();
+        }
+
+        // Idle Screensaver check
+        if (!idleOrbitActive && Date.now() - lastActivityTime > IDLE_TIMEOUT_MS && wormholes.length > 0) {
+            idleOrbitActive = true;
+            warpActive = true;
+            if (typeof playWarpSpoolSound === 'function') playWarpSpoolSound(true);
+            // Pick the nearest wormhole as orbit target
+            let nearestWH = wormholes[0];
+            let nearestDist = Infinity;
+            wormholes.forEach(w => {
+                const d = camera.position.distanceTo(w.group.position);
+                if (d < nearestDist) { nearestDist = d; nearestWH = w; }
+            });
+            setAutopilotTarget(nearestWH);
+            enableAutopilot();
+            const notice = document.getElementById('idle-screensaver-notice');
+            if (notice) notice.classList.add('visible');
         }
     } else if (currentScene === SCENES.WORMHOLE_TRAVEL) {
         // Check if this is a reverse travel (returning)
@@ -672,6 +721,33 @@ function setupEventListeners() {
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     document.addEventListener('mousemove', onMouseMove);
+
+    // Reset idle timer on any user interaction
+    ['keydown','mousedown','touchstart'].forEach(evt => {
+        window.addEventListener(evt, resetIdleTimer, { passive: true });
+    });
+
+    // Inject idle screensaver notice if not already present
+    if (!document.getElementById('idle-screensaver-notice')) {
+        const notice = document.createElement('div');
+        notice.id = 'idle-screensaver-notice';
+        notice.innerHTML = '<span>SCREENSAVER MODE — Press any key to take control</span>';
+        notice.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.4);color:#00ff88;font-family:Orbitron,sans-serif;font-size:12px;padding:10px 24px;border-radius:6px;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.5s;';
+        document.body.appendChild(notice);
+        // CSS trick: add 'visible' class to show it
+        const style = document.createElement('style');
+        style.textContent = '#idle-screensaver-notice.visible { opacity: 1; }';
+        document.head.appendChild(style);
+    }
+
+    // Inject wormhole destination preview tooltip
+    if (!document.getElementById('wormhole-tooltip')) {
+        const tt = document.createElement('div');
+        tt.id = 'wormhole-tooltip';
+        tt.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%, -120px);background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.2);color:#fff;font-family:Orbitron,sans-serif;padding:10px 16px;border-radius:8px;z-index:5000;pointer-events:none;opacity:0;transition:opacity 0.3s;text-align:center;min-width:140px;';
+        tt.innerHTML = '<div id="wt-swatch" style="width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;"></div><span id="wt-label">TARGET</span>';
+        document.body.appendChild(tt);
+    }
 
     // Initialize mobile controls if on mobile device
     if (typeof initMobileControls === 'function') {

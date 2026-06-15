@@ -98,6 +98,11 @@
             <span class="rover-hud-label">KIOSK</span>
             <span class="rover-hud-value rover-hud-key">[ F ]</span>
         </div>
+        <!-- Minimap -->
+        <div class="rover-hud-item" style="padding:4px;">
+            <span class="rover-hud-label" style="display:block;text-align:center;margin-bottom:2px;">MINIMAP</span>
+            <canvas id="rover-minimap" width="80" height="80" style="border:1px solid rgba(0,255,136,0.4);border-radius:4px;background:rgba(0,0,0,0.5);"></canvas>
+        </div>
     </div>
 
     <!-- Kiosk Modal -->
@@ -130,6 +135,13 @@
     <div id="boundary-warning" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); text-align:center; z-index:2000; pointer-events:none;">
         <h1 style="color:#ff0033; font-family:'Orbitron', sans-serif; font-size:3rem; text-shadow: 0 0 20px #ff0000; margin:0; animation: flash 1s infinite;">WARNING</h1>
         <p style="color:#ffaaaa; font-family:'Inter', sans-serif; font-size:1.2rem; background:rgba(255,0,0,0.2); padding:10px 20px; border-radius:5px; border:1px solid #ff0033;">LEAVING EXPLORATION ZONE. RETURN TO BASE.</p>
+    </div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement-toast" style="display:none; position:fixed; top:24px; right:24px; z-index:9999; background:rgba(0,20,10,0.92); border:1px solid #00ff88; border-radius:10px; padding:14px 20px; color:#00ff88; font-family:'Orbitron',sans-serif; font-size:12px; min-width:220px; box-shadow:0 0 24px rgba(0,255,136,0.35); transition: opacity 0.5s;">
+        <div style="font-size:9px;letter-spacing:2px;opacity:0.7;margin-bottom:4px;">ACHIEVEMENT UNLOCKED</div>
+        <div id="achievement-title" style="font-size:14px;font-weight:bold;">First Landing</div>
+        <div id="achievement-desc" style="font-size:10px;opacity:0.7;margin-top:3px;">You set foot on another world.</div>
     </div>
 
     <style>
@@ -244,6 +256,7 @@ READY FOR INTERFACE COMMANDS.</div>
 
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sun_shader.js"></script>
     <script src="app.js?v=9"></script>
 </body>
 

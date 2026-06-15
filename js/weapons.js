@@ -2,11 +2,76 @@
 // AI Interactive Console Logic
 // ========================================
 
+// Circular command log buffer (last 20 entries)
+const consoleLogBuffer = [];
+const MAX_LOG_BUFFER = 20;
+
+// Command history for arrow-up recall
+const cmdHistory = [];
+let cmdHistoryIndex = -1;
+
 function initConsole() {
     const inputLeft = document.getElementById('ap-console-input');
     const inputBottom = document.getElementById('ap-console-input-bottom');
     const output = document.getElementById('ap-console-out');
     if (!output) return;
+    
+    function attachHistory(input) {
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (cmdHistoryIndex < cmdHistory.length - 1) {
+                    cmdHistoryIndex++;
+                    input.value = cmdHistory[cmdHistoryIndex];
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (cmdHistoryIndex > 0) {
+                    cmdHistoryIndex--;
+                    input.value = cmdHistory[cmdHistoryIndex];
+                } else {
+                    cmdHistoryIndex = -1;
+                    input.value = '';
+                }
+            } else {
+                playClickSound();
+            }
+        });
+    }
+    
+    function attachSubmit(inputEl, otherInput) {
+        inputEl.addEventListener('focus', () => { isConsoleTyping = true; });
+        inputEl.addEventListener('blur',  () => { isConsoleTyping = false; });
+        attachHistory(inputEl);
+        inputEl.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                const rawVal = inputEl.value;
+                const cleanVal = rawVal.trim().toLowerCase();
+                inputEl.value = '';
+                if (otherInput) otherInput.value = '';
+                if (cleanVal.length === 0) return;
+                // Save to history
+                cmdHistory.unshift(cleanVal);
+                if (cmdHistory.length > 50) cmdHistory.pop();
+                cmdHistoryIndex = -1;
+                writeToConsole(`> ${rawVal}`);
+                executeConsoleCommand(cleanVal);
+            }
+        });
+    }
+    
+    const output2 = output; // same ref
+    if (inputLeft) attachSubmit(inputLeft, inputBottom);
+    if (inputBottom) attachSubmit(inputBottom, inputLeft);
+}
+
+function writeToConsole(text) {
+    // Save to circular buffer
+    consoleLogBuffer.push(text);
+    if (consoleLogBuffer.length > MAX_LOG_BUFFER) consoleLogBuffer.shift();
+    
+    const output = document.getElementById('ap-console-out');
+
     
     // Left input setup
     if (inputLeft) {
@@ -108,7 +173,7 @@ function executeConsoleCommand(command) {
     
     switch (cmd) {
         case 'help':
-            writeToConsole("COMMANDS LOG:\n- help: show options\n- scan: range to targets\n- systems: diagnostic checks\n- ap [dest]: engage autopilot\n- ap off: disengage autopilot\n- warp: toggle speed streaks\n- sound: toggle audio feedback\n- steer: toggle steering mode (FREE / CONE)\n- shunt [engines|shields|systems]: route power\n- vent: flush coolant systems");
+            writeToConsole("COMMANDS LOG:\n- help: show options\n- scan: range to targets\n- systems: diagnostic checks\n- ap [dest]: engage autopilot\n- ap off: disengage autopilot\n- warp: toggle speed streaks\n- sound: toggle audio feedback\n- steer: toggle steering mode (FREE / CONE)\n- shunt [engines|shields|systems]: route power\n- vent: flush coolant systems\n- status: show current ship status\n- logs: show last 10 console entries\nUsage: <command> --help");
             break;
             
         case 'scan':
@@ -188,19 +253,43 @@ function executeConsoleCommand(command) {
             if (coolantEl && (coolantEl.textContent === 'HIGH TEMP' || coolantEl.textContent === 'LEAK DETECTED' || supernovaActive)) {
                 coolantEl.textContent = 'NOMINAL';
                 coolantEl.className = 'pv ok';
-                writeToConsole("SYSTEM DIAGNOSTIC: AUXILIARY COOLANT FLUSHED. RE-ESTABLISHING THERMAL STEADY STATE.");
-                speakCoPilot("Coolant systems flushed. Thermal loop stable.");
-                if (supernovaActive) {
-                    supernovaTime = 0; // stop flare early on vent
-                }
+                supernovaActive = false;
+                writeToConsole("[OK] COOLANT SYSTEMS VENTED. THERMAL NOMINAL.");
+                speakCoPilot("Coolant vented. Thermal systems nominal.");
             } else {
-                writeToConsole("SYSTEM REPORT: COOLANT SYSTEMS ALREADY STABILIZED.");
+                writeToConsole("[INFO] COOLANT SYSTEMS NOMINAL. VENT NOT REQUIRED.");
             }
+            break;
+
+        case 'status':
+            const posX = camera ? camera.position.x.toFixed(1) : '?';
+            const posY = camera ? camera.position.y.toFixed(1) : '?';
+            const posZ = camera ? camera.position.z.toFixed(1) : '?';
+            let nearestName = 'NONE';
+            let nearestDist = 'N/A';
+            if (wormholes.length > 0) {
+                let min = Infinity;
+                wormholes.forEach(w => {
+                    const d = camera.position.distanceTo(w.group.position);
+                    if (d < min) { min = d; nearestName = w.config.label.toUpperCase(); nearestDist = min.toFixed(0) + 'u'; }
+                });
+            }
+            const shieldStr = typeof shieldEnergy !== 'undefined' ? shieldEnergy.toFixed(1) + '%' : 'N/A';
+            const reactorEl = document.getElementById('cp-reactor-val');
+            const reactorStr = reactorEl ? reactorEl.textContent : 'N/A';
+            writeToConsole(
+                `STATUS REPORT:\nPOS: (${posX}, ${posY}, ${posZ})\nNEAREST: ${nearestName} @ ${nearestDist}\nSHIELDS: ${shieldStr}\nREACTOR: ${reactorStr}\nPOWER MODE: ${(powerMode || 'systems').toUpperCase()}\nSOUND: ${soundEnabled ? 'ON' : 'OFF'}\nAUTOPILOT: ${autopilotActive ? 'ENGAGED' : 'OFFLINE'}`
+            );
+            break;
+
+        case 'logs':
+            const last = consoleLogBuffer.slice(-10);
+            writeToConsole('LAST ' + last.length + ' LOG ENTRIES:');
+            last.forEach(l => writeToConsole(l));
             break;
             
         default:
-            writeToConsole(`UNKNOWN COMMAND: "${cmd}". TYPE "help" FOR LIST.`);
+            writeToConsole(`UNRECOGNIZED: "${cmd}". Type 'help' for options.`);
             break;
     }
 }
-

@@ -101,6 +101,37 @@ let surfaceSun = null;
 let surfaceTime = 0;
 
 // ========================================
+// Achievement System & Tracking
+// ========================================
+function unlockAchievement(id, title, desc) {
+    const key = `ach_${id}`;
+    if (localStorage.getItem(key)) return; // Already unlocked
+    localStorage.setItem(key, 'true');
+
+    const toast = document.getElementById('achievement-toast');
+    const titleEl = document.getElementById('achievement-title');
+    const descEl = document.getElementById('achievement-desc');
+    if (toast && titleEl && descEl) {
+        titleEl.textContent = title;
+        descEl.textContent = desc;
+        toast.style.display = 'block';
+        setTimeout(() => toast.style.opacity = '1', 50);
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.style.display = 'none', 500);
+        }, 5000);
+        
+        // Optional: play a nice chime
+        if (soundEnabled && typeof playLockChirp === 'function') {
+            playLockChirp();
+            setTimeout(() => { if (typeof playLockChirp === 'function') playLockChirp(); }, 150);
+        }
+    }
+}
+
+// ========================================
 // Initialization
 // ========================================
 
@@ -254,6 +285,32 @@ function createStarfield() {
 
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
+
+    // Nebula Parallax Layers
+    window.nebulaLayers = [];
+    const createNebulaLayer = (color, opacity, size, zPos, count) => {
+        const geo = new THREE.BufferGeometry();
+        const verts = [];
+        for (let i = 0; i < count; i++) {
+            verts.push((Math.random() - 0.5) * 4000, (Math.random() - 0.5) * 4000, zPos + (Math.random() - 0.5) * 500);
+        }
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        const mat = new THREE.PointsMaterial({
+            color: color,
+            size: size,
+            transparent: true,
+            opacity: opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const mesh = new THREE.Points(geo, mat);
+        scene.add(mesh);
+        window.nebulaLayers.push(mesh);
+    };
+
+    createNebulaLayer(0x8800ff, 0.05, 300, -1000, 50);
+    createNebulaLayer(0x00aaff, 0.05, 400, -1500, 40);
+    createNebulaLayer(0xff00aa, 0.03, 500, -2000, 30);
 }
 
 // ========================================
@@ -373,10 +430,10 @@ function createSystem(data) {
     group.position.set(data.position.x, data.position.y, data.position.z);
     group.userData.name = data.name;
 
-    // Central star — MeshBasicMaterial (unlit, no emissive needed)
-    const starGeometry = new THREE.SphereGeometry(12, 32, 32);
-    const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const star = new THREE.Mesh(starGeometry, starMaterial);
+    // Star
+    const starGeo = new THREE.SphereGeometry(data.planets[0].orbit * 0.2, 128, 128); // high res for displacement
+    const starMat = typeof createSunMaterial === 'function' ? createSunMaterial() : new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+    const star = new THREE.Mesh(starGeo, starMat);
     group.add(star);
 
     // Multiple Star glow halos for an intense emissive look
@@ -535,6 +592,22 @@ function createPlanet(data) {
     const light = new THREE.PointLight(0xffffff, 0.3, data.size * 3);
     light.position.set(data.size * 2, data.size, data.size * 2);
     planetGroup.add(light);
+
+    // Saturn-style rings on Education (Ice) planet
+    if (data.name === 'Education') {
+        const ringGeo = new THREE.RingGeometry(data.size * 1.5, data.size * 2.5, 64);
+        const ringMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            roughness: 0.5
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2.2;
+        ring.rotation.y = Math.PI / 8;
+        planetGroup.add(ring);
+    }
 
     planetGroup.userData.name = data.name;
     planetGroup.userData.planet = planet; // Store reference for rotation
@@ -768,6 +841,34 @@ function animate() {
         asteroidBelt.rotation.y += 0.0005;
     }
 
+    // Rotate Nebula Layers
+    if (window.nebulaLayers) {
+        window.nebulaLayers.forEach((layer, index) => {
+            // Parallax effect: inner layers rotate slower, outer layers faster, alternating direction
+            const direction = index % 2 === 0 ? 1 : -1;
+            const speed = 0.0001 * (index + 1);
+            layer.rotation.z += speed * direction;
+            layer.rotation.x += speed * 0.5 * direction;
+        });
+    }
+
+    // Asteroid collision wobble
+    if (!isRoverMode && currentView === '3D') {
+        const d = Math.sqrt(camera3D.position.x**2 + camera3D.position.z**2);
+        if (d > 120 && d < 420 && Math.abs(camera3D.position.y) < 15) {
+            camera3D.position.y += (Math.random() - 0.5) * 0.4;
+            camera3D.position.x += (Math.random() - 0.5) * 0.4;
+            if (Math.random() < 0.02) {
+                writeToConsole("WARNING: DEBRIS COLLISION DETECTED.");
+            }
+        }
+    }
+
+    // Update Sun Shader Time
+    if (window.sunUniforms) {
+        window.sunUniforms.time.value = performance.now() * 0.001;
+    }
+
     // Update planet orbits and rotation
     starSystems.forEach(system => {
         system.planets.forEach(planet => {
@@ -937,6 +1038,9 @@ function updateRoverMovement() {
 
             // Smooth slerp rotation
             rover.quaternion.slerp(targetQuat, slerpFactor);
+        } else {
+            // Fallback: stay on ground if raycast misses
+            rover.position.y = Math.max(rover.position.y, 0);
         }
     }
 
@@ -1022,6 +1126,132 @@ function updateRoverMovement() {
         roverScene.userData.energyAlien.rotation.x += 0.01;
         roverScene.userData.energyAlien.position.y = Math.sin(time * 0.003) * 1.5; // Floating
     }
+
+    // Weather
+    if (surfaceParticles) {
+        surfaceParticleTime += 0.01;
+        const pos = surfaceParticles.geometry.attributes.position.array;
+        const b = roverScene.userData.biome;
+        for (let i = 0; i < pos.length; i += 3) {
+            if (b === 'forest' || b === 'ice') { // rain/snow falls
+                pos[i+1] -= (b === 'forest' ? 2 : 0.5);
+                if (pos[i+1] < 0) pos[i+1] = 100;
+            } else { // drifting particles
+                pos[i] += Math.sin(surfaceParticleTime + i) * 0.1;
+                pos[i+1] += Math.cos(surfaceParticleTime + i) * 0.1;
+            }
+        }
+        surfaceParticles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Collectibles Proximity
+    if (roverScene.userData.collectibles) {
+        for (let c of roverScene.userData.collectibles) {
+            if (!c.userData.collected) {
+                c.rotation.y += 0.05;
+                c.position.y += Math.sin(time * 0.005 + c.position.x) * 0.02;
+                if (rover.position.distanceTo(c.position) < 5) {
+                    c.userData.collected = true;
+                    roverScene.remove(c);
+                    unlockAchievement('collected_' + c.id, 'Data Log Found', 'You discovered a hidden data fragment.');
+                    if (typeof speakCoPilot === 'function') speakCoPilot("Data log recovered.");
+                }
+            }
+        }
+    }
+
+    // Footprints
+    if (!roverScene.userData.footprints) roverScene.userData.footprints = [];
+    if (isGroundedState && Math.abs(roverVelocity) > 0.1) {
+        if (!roverScene.userData.lastFootprintTime || time - roverScene.userData.lastFootprintTime > 200) {
+            roverScene.userData.lastFootprintTime = time;
+            
+            const fGeo = new THREE.PlaneGeometry(1.5, 0.5);
+            const fMat = new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false});
+            const footprint = new THREE.Mesh(fGeo, fMat);
+            footprint.rotation.x = -Math.PI / 2;
+            footprint.rotation.z = -rover.rotation.y;
+            footprint.position.copy(rover.position);
+            footprint.position.y += 0.05;
+            roverScene.add(footprint);
+            
+            roverScene.userData.footprints.push(footprint);
+            if (roverScene.userData.footprints.length > 50) {
+                const old = roverScene.userData.footprints.shift();
+                roverScene.remove(old);
+                old.geometry.dispose();
+                old.material.dispose();
+            }
+        }
+    }
+
+    drawMinimap();
+}
+
+function drawMinimap() {
+    const canvas = document.getElementById('rover-minimap');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    const cx = width / 2;
+    const cy = height / 2;
+    const scale = 0.1;
+    
+    // Draw Base
+    ctx.fillStyle = '#444';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 15 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw Kiosks
+    if (roverScene.userData.kiosks) {
+        ctx.fillStyle = '#00aaff';
+        roverScene.userData.kiosks.forEach(k => {
+            ctx.beginPath();
+            ctx.arc(cx + k.position.x * scale, cy + k.position.z * scale, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    // Draw Collectibles
+    if (roverScene.userData.collectibles) {
+        ctx.fillStyle = '#ffaa00';
+        roverScene.userData.collectibles.forEach(c => {
+            if (!c.userData.collected) {
+                ctx.beginPath();
+                ctx.arc(cx + c.position.x * scale, cy + c.position.z * scale, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+
+    // Draw Rover
+    const rx = cx + rover.position.x * scale;
+    const rz = cy + rover.position.z * scale;
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(
+        rx + Math.sin(rover.rotation.y) * 4,
+        rz + Math.cos(rover.rotation.y) * 4
+    );
+    ctx.lineTo(
+        rx - Math.sin(rover.rotation.y + Math.PI*0.8) * 3,
+        rz - Math.cos(rover.rotation.y + Math.PI*0.8) * 3
+    );
+    ctx.lineTo(
+        rx - Math.sin(rover.rotation.y - Math.PI*0.8) * 3,
+        rz - Math.cos(rover.rotation.y - Math.PI*0.8) * 3
+    );
+    ctx.closePath();
+    ctx.fill();
 }
 
 
@@ -1445,7 +1675,11 @@ function showPlanetInfo(planet) {
     const content = planet.userData.content;
     const billboards = planet.userData.billboards || [];
 
-    document.getElementById('cardTitle').textContent = content.title;
+    let titleText = content.title;
+    if (localStorage.getItem(`visited_${content.title}`)) {
+        titleText += ' [VISITED ✓]';
+    }
+    document.getElementById('cardTitle').textContent = titleText;
 
     let billboardHTML = '';
     if (billboards.length > 0) {
@@ -1517,8 +1751,7 @@ function createSurfaceEnvironment(planetData) {
 
     // 1. Terrain — smaller tile (fog hides edges), world-wrap boundary keeps it infinite-feeling
     // TERRAIN_HALF must match WRAP constant in updateRoverMovement
-    const TERRAIN_SIZE = 600;
-    const groundGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, 80, 80);
+    const groundGeo = new THREE.PlaneGeometry(800, 800, 80, 80);
     const pos = groundGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
@@ -1538,6 +1771,8 @@ function createSurfaceEnvironment(planetData) {
         pos.setZ(i, height);
     }
     groundGeo.computeVertexNormals();
+    groundGeo.computeBoundingBox();
+    groundGeo.computeBoundingSphere();
 
     const groundMat = new THREE.MeshStandardMaterial({
         color: groundColor,
@@ -1551,6 +1786,7 @@ function createSurfaceEnvironment(planetData) {
 
     roverScene.userData.ground = ground;
     roverScene.userData.biome = biome;
+    roverScene.userData.skyColor = new THREE.Color(skyColor);
 
     // Water for forest
     if (biome === 'forest') {
@@ -2140,6 +2376,43 @@ function createSurfaceEnvironment(planetData) {
         launchPad = baseGroup;
         roverScene.add(launchPad);
     }
+    
+    createCollectibles(biome, ground);
+}
+
+function createCollectibles(biome, ground) {
+    roverScene.userData.collectibles = [];
+    const count = 10;
+    const geo = new THREE.OctahedronGeometry(1.5, 0);
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 0.5, transparent: true, opacity: 0.9
+    });
+    const raycaster = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+
+    for (let i=0; i<count; i++) {
+        const x = (Math.random() - 0.5) * 600;
+        const z = (Math.random() - 0.5) * 600;
+        if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; // Not too close to base
+
+        raycaster.set(new THREE.Vector3(x, 100, z), down);
+        const intersects = raycaster.intersectObject(ground);
+        if (intersects.length > 0) {
+            const y = intersects[0].point.y + 2; // hover above ground
+            if (biome === 'forest' && y < 4) continue; // not underwater
+            
+            const crystal = new THREE.Mesh(geo, mat);
+            crystal.position.set(x, y, z);
+            
+            const light = new THREE.PointLight(0xffaa00, 1, 10);
+            crystal.add(light);
+            
+            crystal.userData.collected = false;
+            crystal.id = Math.random().toString(36).substr(2, 9);
+            roverScene.add(crystal);
+            roverScene.userData.collectibles.push(crystal);
+        }
+    }
 }
 
 // ========================================
@@ -2198,6 +2471,20 @@ function initiateLanding(planet) {
         starSystems.forEach(system => system.group.visible = false);
         roverScene.visible = true;
         createSurfaceEnvironment(currentPlanetData);
+
+        // Tracking & Achievements
+        const pName = currentPlanetData.content?.title || currentPlanetData.name;
+        if (pName) {
+            localStorage.setItem(`visited_${pName}`, 'true');
+        }
+        unlockAchievement('first_landing', 'First Landing', 'You set foot on another world.');
+        
+        // Biome Narration
+        const biome = roverScene.userData.biome;
+        if (typeof speakCoPilot === 'function') {
+            speakCoPilot(`Entering ${biome} biome on ${pName}. Surface systems online.`);
+        }
+
 
         // Reset rover starting position, rotation, velocity and mouse-look state
         if (rover) { 
@@ -2322,6 +2609,8 @@ function initiateLanding(planet) {
                         // Reveal rover, hide dropship (could animate doors but simple fade is robust)
                         roverScene.remove(dropshipGroup);
                         rover.visible = true;
+                        rover.position.y = 2; // Ensure it starts above ground
+                        rover.userData.velocityY = 0;
                         document.getElementById('rover-hud').style.display = 'flex';
                         isLandingAnim = false; // Unlock controls!
                     }
