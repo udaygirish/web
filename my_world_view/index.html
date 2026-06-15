@@ -84,11 +84,24 @@
         </div>
         <div class="rover-hud-item">
             <span class="rover-hud-label">DRIVE</span>
-            <span class="rover-hud-value" style="font-size:0.7rem;">W / S / A / D</span>
+            <span class="rover-hud-value" style="font-size:0.6rem;">W A S D</span>
+        </div>
+        <div class="rover-hud-item">
+            <span class="rover-hud-label">BOOST</span>
+            <span class="rover-hud-value" style="font-size:0.6rem;">SHIFT</span>
+        </div>
+        <div class="rover-hud-item">
+            <span class="rover-hud-label">JUMP</span>
+            <span class="rover-hud-value" style="font-size:0.6rem;">SPACE</span>
         </div>
         <div class="rover-hud-item" id="interact-hint" style="display:none; background: rgba(0,255,136,0.2);">
             <span class="rover-hud-label">KIOSK</span>
             <span class="rover-hud-value rover-hud-key">[ F ]</span>
+        </div>
+        <!-- Minimap -->
+        <div class="rover-hud-item" style="padding:4px;">
+            <span class="rover-hud-label" style="display:block;text-align:center;margin-bottom:2px;">MINIMAP</span>
+            <canvas id="rover-minimap" width="80" height="80" style="border:1px solid rgba(0,255,136,0.4);border-radius:4px;background:rgba(0,0,0,0.5);"></canvas>
         </div>
     </div>
 
@@ -113,10 +126,137 @@
         <div class="card-body" id="cardContent">
             <!-- Content will be inserted dynamically -->
         </div>
+        <div class="card-footer" style="padding-top:15px; margin-top:10px; border-top:1px solid rgba(0,255,136,0.2);">
+            <button id="land-btn" class="land-btn-primary" style="display:none;">INITIATE LANDING</button>
+        </div>
     </div>
+
+    <!-- Boundary Warning Overlay -->
+    <div id="boundary-warning" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); text-align:center; z-index:2000; pointer-events:none;">
+        <h1 style="color:#ff0033; font-family:'Orbitron', sans-serif; font-size:3rem; text-shadow: 0 0 20px #ff0000; margin:0; animation: flash 1s infinite;">WARNING</h1>
+        <p style="color:#ffaaaa; font-family:'Inter', sans-serif; font-size:1.2rem; background:rgba(255,0,0,0.2); padding:10px 20px; border-radius:5px; border:1px solid #ff0033;">LEAVING EXPLORATION ZONE. RETURN TO BASE.</p>
+    </div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement-toast" style="display:none; position:fixed; top:24px; right:24px; z-index:9999; background:rgba(0,20,10,0.92); border:1px solid #00ff88; border-radius:10px; padding:14px 20px; color:#00ff88; font-family:'Orbitron',sans-serif; font-size:12px; min-width:220px; box-shadow:0 0 24px rgba(0,255,136,0.35); transition: opacity 0.5s;">
+        <div style="font-size:9px;letter-spacing:2px;opacity:0.7;margin-bottom:4px;">ACHIEVEMENT UNLOCKED</div>
+        <div id="achievement-title" style="font-size:14px;font-weight:bold;">First Landing</div>
+        <div id="achievement-desc" style="font-size:10px;opacity:0.7;margin-top:3px;">You set foot on another world.</div>
+    </div>
+
+    <style>
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .mob-btn {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid rgba(0, 255, 136, 0.5);
+            color: #00ff88;
+            border-radius: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            cursor: pointer;
+            padding: 15px 10px;
+        }
+        .mob-btn:active {
+            background: rgba(0, 255, 136, 0.6);
+            color: #fff;
+        }
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex !important; }
+        }
+    </style>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls" style="display:none; position:fixed; bottom:20px; left:20px; right:20px; z-index:9000; pointer-events:none; justify-content:space-between; align-items:flex-end;">
+        <div style="pointer-events:auto; display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px; gap: 10px;">
+            <button class="mob-btn" onmousedown="dispatchKey('w')" onmouseup="releaseKey('w')" ontouchstart="dispatchKey('w'); event.preventDefault()" ontouchend="releaseKey('w'); event.preventDefault()" style="grid-column: 2; grid-row: 1;">W</button>
+            <button class="mob-btn" onmousedown="dispatchKey('a')" onmouseup="releaseKey('a')" ontouchstart="dispatchKey('a'); event.preventDefault()" ontouchend="releaseKey('a'); event.preventDefault()" style="grid-column: 1; grid-row: 2;">A</button>
+            <button class="mob-btn" onmousedown="dispatchKey('s')" onmouseup="releaseKey('s')" ontouchstart="dispatchKey('s'); event.preventDefault()" ontouchend="releaseKey('s'); event.preventDefault()" style="grid-column: 2; grid-row: 2;">S</button>
+            <button class="mob-btn" onmousedown="dispatchKey('d')" onmouseup="releaseKey('d')" ontouchstart="dispatchKey('d'); event.preventDefault()" ontouchend="releaseKey('d'); event.preventDefault()" style="grid-column: 3; grid-row: 2;">D</button>
+        </div>
+        <div style="pointer-events:auto; display:flex; gap: 10px; flex-direction:column;">
+            <div style="display:flex; gap: 10px;">
+                <button class="mob-btn" onmousedown="dispatchKey('e')" onmouseup="releaseKey('e')" ontouchstart="dispatchKey('e'); event.preventDefault()" ontouchend="releaseKey('e'); event.preventDefault()" style="width:100%;">LAUNCH [E]</button>
+                <button class="mob-btn" onmousedown="dispatchKey('f')" onmouseup="releaseKey('f')" ontouchstart="dispatchKey('f'); event.preventDefault()" ontouchend="releaseKey('f'); event.preventDefault()" style="width:100%;">KIOSK [F]</button>
+            </div>
+            <div style="display:flex; gap: 10px;">
+                <button class="mob-btn" onmousedown="dispatchKey(' ')" onmouseup="releaseKey(' ')" ontouchstart="dispatchKey(' '); event.preventDefault()" ontouchend="releaseKey(' '); event.preventDefault()" style="width:100%;">JUMP [SPC]</button>
+                <button class="mob-btn" onmousedown="dispatchKey('shift')" onmouseup="releaseKey('shift')" ontouchstart="dispatchKey('shift'); event.preventDefault()" ontouchend="releaseKey('shift'); event.preventDefault()" style="width:100%;">BOOST [SH]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cockpit Bezel (Spaceship HUD) -->
+    <div id="cockpit-bezel" class="hidden">
+        <!-- Targeting Crosshair -->
+        <div class="crosshair">
+            <div class="ch-h"></div>
+            <div class="ch-v"></div>
+            <div class="ch-ring"></div>
+            <div class="ch-dot"></div>
+        </div>
+
+        <!-- Floating AI Console Output Overlay -->
+        <div class="console-output bottom-console-output" id="ap-console-out">SYSTEM LOG OVERVIEW:
+READY FOR INTERFACE COMMANDS.</div>
+
+        <div class="cockpit-panel cockpit-panel-left">
+            <div class="panel-title">NAV COMPUTER</div>
+            <div class="panel-row"><span class="pl">SECTOR α</span><span class="pv" id="cp-x">0.0000</span></div>
+            <div class="panel-row"><span class="pl">SECTOR β</span><span class="pv" id="cp-y">0.0000</span></div>
+            <div class="panel-row"><span class="pl">SECTOR γ</span><span class="pv" id="cp-z">0.0000</span></div>
+            <div class="panel-sep"></div>
+            <div class="panel-title">SYSTEMS</div>
+            <div class="panel-row"><span class="pl">HULL</span><span class="pv ok">NOMINAL</span></div>
+            <div class="panel-row"><span class="pl">NAV</span><span class="pv ok">ONLINE</span></div>
+            <div class="panel-row"><span class="pl">SOUND</span><span class="pv ok" id="cp-sound-val" style="cursor: pointer;" title="Click to toggle sound">ON</span></div>
+        </div>
+
+        <div class="cockpit-panel cockpit-panel-right">
+            <div class="panel-title">PLANETARY SCANNER</div>
+            <div class="panel-row"><span class="pl">TARGET</span><span class="pv" id="cp-target">---</span></div>
+            <div class="panel-row"><span class="pl">DIST</span><span class="pv" id="cp-dist">---</span></div>
+            <div class="panel-sep"></div>
+            <!-- The new integrated LAND button -->
+            <button id="cockpit-land-btn" class="ap-btn" style="display:none; width:100%; pointer-events:auto; border-color:#ff006e; color:#ff006e;">INITIATE LANDING</button>
+        </div>
+
+        <div class="cockpit-bottom">
+            <div class="cockpit-label-brand">CONSTELLATION MK.III &bull; FLIGHT CONTROL SYSTEM</div>
+            <div class="ctrl-section">
+                <div class="ctrl-title">THRUST</div>
+                <div class="wasd-cluster">
+                    <div class="kr"><div class="nav-key" id="ck-w">W</div></div>
+                    <div class="kr">
+                        <div class="nav-key" id="ck-a">A</div>
+                        <div class="nav-key" id="ck-s">S</div>
+                        <div class="nav-key" id="ck-d">D</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="ctrl-divider terminal-divider"></div>
+
+            <div class="ctrl-section terminal-section">
+                <div class="ctrl-title">NAV TERMINAL</div>
+                <input type="text" id="ap-console-input-bottom" class="bottom-console-input" placeholder="ENTER SYSTEM COMMAND" autocomplete="off" spellcheck="false" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Link the root styles for the cockpit UI -->
+    <link rel="stylesheet" href="../styles.css">
 
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sun_shader.js"></script>
     <script src="app.js?v=9"></script>
 </body>
 

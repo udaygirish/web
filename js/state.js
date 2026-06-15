@@ -55,7 +55,7 @@ window.cameraShakeAmount = 0.0;
 
 // Sound Synthesizer & Co-Pilot voice state
 window.audioCtx = null;
-window.soundEnabled = false;
+window.soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 window.engineOsc = null;
 window.engineFilter = null;
 window.engineGain = null;

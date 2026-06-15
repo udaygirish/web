@@ -288,35 +288,53 @@ body {
     font-size: 0.9rem;
     line-height: 1.6;
     color: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
     margin-bottom: 15px;
 }
 
 .card-body h3 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 0.9rem;
-    color: #9d4edd;
+    color: #00ff88;
     margin-bottom: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 1.1rem;
 }
 
 .card-body ul {
-    list-style: none;
+    list-style-type: none;
     padding: 0;
 }
 
 .card-body li {
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
-    padding: 4px 0 4px 15px;
-    position: relative;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
 }
 
-.card-body li::before {
-    content: '•';
-    position: absolute;
-    left: 0;
-    color: #4cc9f0;
+.card-body li:last-child {
+    border-bottom: none;
+}
+
+/* Landing Button Upgrade */
+.land-btn-primary {
+    width: 100%;
+    background: linear-gradient(90deg, #00ff88, #00aa55);
+    color: #000;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.land-btn-primary:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+    background: linear-gradient(90deg, #00ffaa, #00cc66);
 }
 
 .close-card-btn {

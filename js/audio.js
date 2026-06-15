@@ -70,6 +70,7 @@ function initAudioSynth() {
 
 function toggleSound(forcedState) {
     soundEnabled = forcedState !== undefined ? forcedState : !soundEnabled;
+    localStorage.setItem('soundEnabled', soundEnabled);
     const soundToggle = document.getElementById('cp-sound-val');
     
     if (soundEnabled) {
@@ -303,6 +304,8 @@ function shuntPower(mode) {
             coolantVal.textContent = 'HIGH TEMP';
             coolantVal.className = 'pv warn';
         }
+        const speedElOC = document.getElementById('cp-speed');
+        if (speedElOC) { speedElOC.style.color = '#ffaa00'; speedElOC.title = 'OVERCLOCKED'; }
         
         writeToConsole("REACTOR PATHWAY: DIVERTER SHUNTED TO PROPULSION VECTOR. REACTOR OVERLOAD DETECTED.");
         speakCoPilot("Engines shunted. Shield grid offline. Coolant temperature rising.");
@@ -322,6 +325,8 @@ function shuntPower(mode) {
             coolantVal.textContent = 'NOMINAL';
             coolantVal.className = 'pv ok';
         }
+        const speedElTH = document.getElementById('cp-speed');
+        if (speedElTH) { speedElTH.style.color = '#4cc9f0'; speedElTH.title = 'THROTTLED'; }
         
         writeToConsole("REACTOR PATHWAY: DIVERTER SHUNTED TO SHIELD AMPLIFIERS. PROPULSION OUTPUT THROTTLED.");
         speakCoPilot("Deflector grid shunted. Engines output restricted.");
@@ -341,6 +346,8 @@ function shuntPower(mode) {
             coolantVal.textContent = 'NOMINAL';
             coolantVal.className = 'pv ok';
         }
+        const speedElBL = document.getElementById('cp-speed');
+        if (speedElBL) { speedElBL.style.color = ''; speedElBL.title = ''; }
         
         writeToConsole("REACTOR PATHWAY: CONDUIT DIVERTERS BALANCED. ALL SYSTEMS INTEGRATED.");
         speakCoPilot("Grid power levels balanced.");
