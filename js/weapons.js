@@ -89,6 +89,23 @@ function executeConsoleCommand(command) {
     const cmd = parts[0];
     const arg = parts.slice(1).join(' ');
     
+    const isHelp = parts.includes('--help') || (cmd === 'help' && arg);
+    if (isHelp) {
+        const targetCmd = cmd === 'help' ? parts[1] : cmd;
+        switch (targetCmd) {
+            case 'scan': writeToConsole("SCAN [no args]: Pings the nearest target and outputs distance in Light Years (LY)."); return;
+            case 'systems': writeToConsole("SYSTEMS [no args]: Runs a diagnostic check on core ship functions."); return;
+            case 'ap':
+            case 'autopilot': writeToConsole("AP [destination|off]: Engages or disengages autopilot.\nExamples: 'ap work', 'ap off'"); return;
+            case 'warp': writeToConsole("WARP [no args]: Toggles hyperspace visual streaks on/off."); return;
+            case 'sound': writeToConsole("SOUND [no args]: Toggles the audio feedback on/off."); return;
+            case 'steer': writeToConsole("STEER [no args]: Toggles mouse steering between FREE and CONE modes."); return;
+            case 'shunt': writeToConsole("SHUNT [engines|shields|systems]: Routes power to a specific subsystem."); return;
+            case 'vent': writeToConsole("VENT [no args]: Flushes coolant systems."); return;
+            default: writeToConsole(`NO MANUAL ENTRY FOR: ${targetCmd.toUpperCase()}`); return;
+        }
+    }
+    
     switch (cmd) {
         case 'help':
             writeToConsole("COMMANDS LOG:\n- help: show options\n- scan: range to targets\n- systems: diagnostic checks\n- ap [dest]: engage autopilot\n- ap off: disengage autopilot\n- warp: toggle speed streaks\n- sound: toggle audio feedback\n- steer: toggle steering mode (FREE / CONE)\n- shunt [engines|shields|systems]: route power\n- vent: flush coolant systems");

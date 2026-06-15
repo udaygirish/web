@@ -70,6 +70,7 @@ function initAudioSynth() {
 
 function toggleSound(forcedState) {
     soundEnabled = forcedState !== undefined ? forcedState : !soundEnabled;
+    localStorage.setItem('soundEnabled', soundEnabled);
     const soundToggle = document.getElementById('cp-sound-val');
     
     if (soundEnabled) {

@@ -35,6 +35,11 @@ let roverTurn = 0;
 let launchPad = null;
 let currentInteractiveKioskBoard = null;
 
+// Spaceship Rotation State
+let shipPitch = 0;
+let shipYaw = 0;
+const SHIP_ROTATION_SPEED = 0.002;
+
 // Rover mouse-look state
 // Tracks angular offsets applied to the chase camera so the player can
 // look around independently of the rover's heading.
@@ -52,6 +57,48 @@ let audioCtx = null;
 let droneOsc = null;
 let droneGain = null;
 let droneFilter = null;
+let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
+
+// ========================================
+// Terminal / Cockpit Output
+// ========================================
+function writeToConsole(msg) {
+    const out = document.getElementById('ap-console-out');
+    if (!out) return;
+    out.textContent += "\n> " + msg;
+    out.scrollTop = out.scrollHeight; // Auto-scroll
+}
+
+function toggleSound(forcedState) {
+    soundEnabled = forcedState !== undefined ? forcedState : !soundEnabled;
+    localStorage.setItem('soundEnabled', soundEnabled);
+    const soundToggle = document.getElementById('cp-sound-val');
+    
+    if (soundEnabled) {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        if (soundToggle) {
+            soundToggle.textContent = 'ON';
+            soundToggle.className = 'pv ok';
+        }
+        writeToConsole("AUDIO SUBSYSTEMS: ONLINE.");
+    } else {
+        if (soundToggle) {
+            soundToggle.textContent = 'OFF';
+            soundToggle.className = 'pv alert';
+        }
+        if (droneGain && audioCtx) {
+            droneGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+        }
+        writeToConsole("AUDIO SUBSYSTEMS: OFFLINE.");
+    }
+}
+
+// Procedural Environment
+let asteroidBelt = null;
+let surfaceSun = null;
+let surfaceTime = 0;
 
 // ========================================
 // Initialization
@@ -117,11 +164,68 @@ function init() {
     // Create solar systems
     createSolarSystems();
 
+    // Create asteroid belt
+    asteroidBelt = createAsteroidField();
+
     // Event listeners
     setupEventListeners();
 
+    // Terminal Input Listener
+    const terminalInput = document.getElementById('ap-console-input-bottom');
+    if (terminalInput) {
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = terminalInput.value.trim().toLowerCase();
+                terminalInput.value = '';
+                if (cmd) {
+                    writeToConsole(cmd.toUpperCase());
+                    const args = cmd.split(' ');
+                    const mainCmd = args[0];
+                    const isHelp = args.includes('--help');
+
+                    if (isHelp || mainCmd === 'help') {
+                        if (mainCmd === 'sound' || (mainCmd === 'help' && args[1] === 'sound')) {
+                            writeToConsole("SOUND [no args]: Toggles the audio feedback on or off.");
+                        } else if (mainCmd === 'land' || (mainCmd === 'help' && args[1] === 'land')) {
+                            writeToConsole("LAND [no args]: Initiates atmospheric entry on the currently locked planetary target.");
+                        } else {
+                            writeToConsole("COMMANDS LOG:\n- help: show options\n- sound: toggle audio feedback\n- land: initiate landing on target\nUsage: <command> --help");
+                        }
+                    } else if (mainCmd === 'sound') {
+                        toggleSound();
+                    } else if (mainCmd === 'land') {
+                        if (document.getElementById('cockpit-land-btn').style.display === 'block') {
+                            document.getElementById('cockpit-land-btn').click();
+                        } else {
+                            writeToConsole("ERROR: NO PLANETARY TARGET LOCKED.");
+                        }
+                    } else {
+                        writeToConsole("UNRECOGNIZED COMMAND.");
+                    }
+                }
+            }
+        });
+    }
+
+    // Sound Toggle Click Listener
+    const soundToggle = document.getElementById('cp-sound-val');
+    if (soundToggle) {
+        soundToggle.addEventListener('click', () => toggleSound());
+        if (!soundEnabled) {
+            soundToggle.textContent = 'OFF';
+            soundToggle.className = 'pv alert';
+        }
+    }
+
     // Start animation
     animate();
+
+    // Enable cockpit bezel
+    const cockpitBezel = document.getElementById('cockpit-bezel');
+    if (cockpitBezel) {
+        cockpitBezel.classList.remove('hidden');
+        document.body.classList.add('space-theme-active', 'cockpit-bezel-active');
+    }
 }
 
 // ========================================
@@ -271,19 +375,24 @@ function createSystem(data) {
 
     // Central star — MeshBasicMaterial (unlit, no emissive needed)
     const starGeometry = new THREE.SphereGeometry(12, 32, 32);
-    const starMaterial = new THREE.MeshBasicMaterial({ color: data.starColor });
+    const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const star = new THREE.Mesh(starGeometry, starMaterial);
     group.add(star);
 
-    // Star glow halo
-    const glowGeometry = new THREE.SphereGeometry(18, 32, 32);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: data.starColor,
-        transparent: true,
-        opacity: 0.18,
-        blending: THREE.AdditiveBlending
-    });
-    group.add(new THREE.Mesh(glowGeometry, glowMaterial));
+    // Multiple Star glow halos for an intense emissive look
+    const glow1 = new THREE.Mesh(
+        new THREE.SphereGeometry(15, 32, 32),
+        new THREE.MeshBasicMaterial({ color: data.starColor, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending })
+    );
+    const glow2 = new THREE.Mesh(
+        new THREE.SphereGeometry(25, 32, 32),
+        new THREE.MeshBasicMaterial({ color: data.starColor, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
+    );
+    const glow3 = new THREE.Mesh(
+        new THREE.SphereGeometry(45, 32, 32),
+        new THREE.MeshBasicMaterial({ color: data.starColor, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending })
+    );
+    group.add(glow1, glow2, glow3);
 
     // Star PointLight — illuminates planet day-sides, dims night-sides
     const starLight = new THREE.PointLight(data.starColor, 1.8, 700);
@@ -523,6 +632,38 @@ function createCloudTexture(size) {
     return texture;
 }
 
+// Create Asteroid Field
+function createAsteroidField() {
+    const asteroidGeo = new THREE.DodecahedronGeometry(1, 0);
+    const asteroidMat = new THREE.MeshStandardMaterial({
+        color: 0x666666,
+        roughness: 0.9,
+        metalness: 0.1
+    });
+
+    const count = 1000;
+    const instanced = new THREE.InstancedMesh(asteroidGeo, asteroidMat, count);
+    const dummy = new THREE.Object3D();
+
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 120 + Math.random() * 300;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        const y = (Math.random() - 0.5) * 30; // Belt thickness
+
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        const scale = 0.5 + Math.random() * 3.5;
+        dummy.scale.set(scale, scale, scale);
+        
+        dummy.updateMatrix();
+        instanced.setMatrixAt(i, dummy.matrix);
+    }
+    scene.add(instanced);
+    return instanced;
+}
+
 // ========================================
 // Animation Loop
 // ========================================
@@ -554,26 +695,47 @@ function animate() {
                 const pz = positions.getZ(i);
 
                 if (biome === 'ice') {
-                    // Snow: fall downward, wrap at ground level
-                    py -= 0.08 + Math.random() * 0.05;
-                    if (py < 0) py += 60;
+                    // Snow: fall downward and drift
+                    py -= 0.15 + Math.random() * 0.05;
+                    positions.setX(i, px + Math.sin(surfaceParticleTime + i) * 0.02);
+                    if (py < 0) py += 100;
                 } else if (biome === 'desert') {
-                    // Dust: drift sideways and upward slowly
-                    positions.setX(i, px + Math.sin(surfaceParticleTime * 0.5 + i) * 0.04);
-                    py += 0.02;
-                    if (py > 40) py -= 40;
+                    // Dust: fast horizontal drift
+                    positions.setX(i, px - 0.5); // wind blowing left
+                    positions.setZ(i, pz - 0.2);
+                    if (px < -200) positions.setX(i, px + 400);
+                    if (pz < -200) positions.setZ(i, pz + 400);
                 } else if (biome === 'forest') {
-                    // Fireflies: slow sine-wave float
-                    positions.setY(i, py + Math.sin(surfaceParticleTime + i * 0.3) * 0.03);
+                    // Rain: fast falling down
+                    py -= 0.8 + Math.random() * 0.4;
+                    if (py < 0) py += 100;
                 } else if (biome === 'alien') {
-                    // Spores: drift upward and spiral
-                    positions.setX(i, px + Math.cos(surfaceParticleTime * 0.4 + i) * 0.05);
-                    py += 0.025;
-                    if (py > 50) py -= 50;
+                    // Spores: drift upward and spiral slowly
+                    positions.setX(i, px + Math.cos(surfaceParticleTime * 0.2 + i) * 0.02);
+                    py += 0.05;
+                    if (py > 100) py -= 100;
                 }
                 positions.setY(i, py);
             }
             positions.needsUpdate = true;
+        }
+
+        // Day/Night Cycle
+        if (surfaceSun) {
+            surfaceTime += 0.001; // slow sun rotation
+            // Sun orbits over the X axis
+            const sunDist = 300;
+            surfaceSun.position.x = Math.cos(surfaceTime) * sunDist;
+            surfaceSun.position.y = Math.sin(surfaceTime) * sunDist;
+            
+            // Adjust light intensity based on height
+            if (surfaceSun.position.y > 0) {
+                surfaceSun.intensity = Math.min(1.2, surfaceSun.position.y / 50);
+                roverScene.background = new THREE.Color().lerpColors(new THREE.Color(0x000000), roverScene.userData.skyColor, surfaceSun.intensity);
+            } else {
+                surfaceSun.intensity = 0;
+                roverScene.background = new THREE.Color(0x000000); // Night sky
+            }
         }
 
         // Update 2D planet labels if in 2D mode
@@ -590,6 +752,21 @@ function animate() {
 
     // Update camera based on controls
     updateMovement();
+    
+    // Update Cockpit Telemetry
+    if (!isRoverMode) {
+        const cpx = document.getElementById('cp-x');
+        const cpy = document.getElementById('cp-y');
+        const cpz = document.getElementById('cp-z');
+        if (cpx) cpx.textContent = camera3D.position.x.toFixed(4);
+        if (cpy) cpy.textContent = camera3D.position.y.toFixed(4);
+        if (cpz) cpz.textContent = camera3D.position.z.toFixed(4);
+    }
+
+    // Rotate Asteroid Belt
+    if (asteroidBelt) {
+        asteroidBelt.rotation.y += 0.0005;
+    }
 
     // Update planet orbits and rotation
     starSystems.forEach(system => {
@@ -613,13 +790,24 @@ function animate() {
             const worldPos = new THREE.Vector3();
             planet.getWorldPosition(worldPos);
             const dist = camera3D.position.distanceTo(worldPos);
-            const approachEl = document.getElementById('planet-approach-hud');
-            if (approachEl && currentView === '3D') {
-                if (dist < 80 && dist > (planet.userData.size || 15) + 8) {
-                    approachEl.textContent = `PLANET: ${planet.userData.name}  |  DIST: ${Math.round(dist)}u  |  CLICK TO LAND`;
-                    approachEl.classList.add('visible');
-                } else {
-                    approachEl.classList.remove('visible');
+            const planetRadius = planet.userData.size || 15;
+            
+            if (currentView === '3D') {
+                const approachEl = document.getElementById('planet-approach-hud');
+                if (approachEl) {
+                    if (dist < 80 && dist > planetRadius + 8) {
+                        approachEl.textContent = `PLANET: ${planet.userData.name}  |  DIST: ${Math.round(dist)}u  |  CLICK TO LAND`;
+                        approachEl.classList.add('visible');
+                    } else {
+                        approachEl.classList.remove('visible');
+                    }
+                }
+                
+                // Collision Auto-Evade
+                if (!isRoverMode && !isLandingAnim && dist < planetRadius + 3) {
+                    const bounceDir = camera3D.position.clone().sub(worldPos).normalize();
+                    camera3D.position.add(bounceDir.multiplyScalar(3));
+                    writeToConsole("WARNING: COLLISION AVOIDANCE TRIGGERED.");
                 }
             }
         });
@@ -654,6 +842,7 @@ function updateRoverMovement() {
 
     const biome = roverScene.userData.biome;
     const ground = roverScene.userData.ground;
+    let isGroundedState = true;
 
     // Check Water Physics
     let inWater = false;
@@ -662,9 +851,17 @@ function updateRoverMovement() {
     }
 
     // Acceleration & Friction
-    const accel = inWater ? 0.02 : 0.05; // slower in water
-    const maxSpeed = inWater ? 0.5 : 2;
-    const friction = inWater ? 0.8 : 0.9;
+    const isBoosting = controls.down; // Shift
+    const accel = inWater ? 0.02 : (isBoosting ? 0.15 : 0.05);
+    const maxSpeed = inWater ? 0.5 : (isBoosting ? 4.0 : 2.0);
+    const friction = inWater ? 0.8 : (isGroundedState ? 0.9 : 0.98); // Less friction in air
+
+    if (roverScene.userData.boostFlame) {
+        roverScene.userData.boostFlame.visible = isBoosting && controls.forward;
+        if (isBoosting) {
+            roverScene.userData.boostFlame.scale.setScalar(0.8 + Math.random() * 0.4);
+        }
+    }
 
     if (controls.forward) roverVelocity += accel;
     else if (controls.backward) roverVelocity -= accel;
@@ -707,10 +904,26 @@ function updateRoverMovement() {
             const hit = intersects[0];
             const targetY = hit.point.y;
             
-            // Smoothly interpolate height
-            rover.position.y += (targetY - rover.position.y) * 0.2;
+            // Apply Gravity
+            rover.userData.velocityY = (rover.userData.velocityY || 0) - 0.12; 
+            rover.position.y += rover.userData.velocityY;
 
-            // Tilt Chassis to match terrain normal
+            // Ground Collision
+            if (rover.position.y <= targetY) {
+                rover.position.y = targetY;
+                rover.userData.velocityY = 0;
+                isGroundedState = true;
+            } else {
+                isGroundedState = false;
+            }
+
+            // Jump
+            if (isGroundedState && controls.up) {
+                rover.userData.velocityY = 2.5;
+            }
+
+            // Tilt Chassis to match terrain normal (only strongly if grounded)
+            const slerpFactor = isGroundedState ? 0.2 : 0.05;
             const normal = hit.face.normal.clone();
             // Transform normal to world space if ground is rotated
             const normalMatrix = new THREE.Matrix3().getNormalMatrix(ground.matrixWorld);
@@ -723,7 +936,7 @@ function updateRoverMovement() {
             targetQuat.multiply(headingQuat);
 
             // Smooth slerp rotation
-            rover.quaternion.slerp(targetQuat, 0.1);
+            rover.quaternion.slerp(targetQuat, slerpFactor);
         }
     }
 
@@ -816,24 +1029,31 @@ function updateMovement() {
     if (currentView !== '3D') return;
 
     const speed = baseSpeed;
+    const direction = new THREE.Vector3();
 
     if (controls.forward) {
-        camera.position.z -= speed;
+        camera.getWorldDirection(direction);
+        camera.position.addScaledVector(direction, speed);
     }
     if (controls.backward) {
-        camera.position.z += speed;
+        camera.getWorldDirection(direction);
+        camera.position.addScaledVector(direction, -speed);
     }
     if (controls.left) {
-        camera.position.x -= speed;
+        direction.set(-1, 0, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, speed);
     }
     if (controls.right) {
-        camera.position.x += speed;
+        direction.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, speed);
     }
     if (controls.up) {
-        camera.position.y += speed;
+        direction.set(0, 1, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, speed);
     }
     if (controls.down) {
-        camera.position.y -= speed;
+        direction.set(0, -1, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, speed);
     }
 }
 
@@ -923,6 +1143,14 @@ function updateSystemInfo() {
 // ========================================
 
 function setupEventListeners() {
+    // Mobile Controls dispatcher
+    window.dispatchKey = function(key) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
+    };
+    window.releaseKey = function(key) {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+    };
+
     window.addEventListener('resize', onWindowResize);
 
     window.addEventListener('keydown', (e) => {
@@ -995,6 +1223,15 @@ function setupEventListeners() {
     });
 
     canvas.addEventListener('mousemove', (e) => {
+        // Spaceship mouse-look
+        if (!isRoverMode && currentView === '3D' && (e.buttons === 2 || document.pointerLockElement === canvas)) {
+            shipYaw -= e.movementX * SHIP_ROTATION_SPEED;
+            shipPitch -= e.movementY * SHIP_ROTATION_SPEED;
+            shipPitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, shipPitch));
+            camera3D.quaternion.setFromEuler(new THREE.Euler(shipPitch, shipYaw, 0, 'YXZ'));
+            return;
+        }
+
         // Rover mouse-look (right-mouse-button held or pointer locked)
         if (isRoverMode && (e.buttons === 2 || document.pointerLockElement === canvas)) {
             roverLookYaw   -= e.movementX * ROVER_LOOK_SENSITIVITY;
@@ -1022,9 +1259,9 @@ function setupEventListeners() {
         }
     });
 
-    // Right-click on canvas in rover mode requests pointer lock for full mouse-look
+    // Right-click on canvas requests pointer lock for full mouse-look
     canvas.addEventListener('contextmenu', (e) => {
-        if (isRoverMode) {
+        if (currentView === '3D') {
             e.preventDefault();
             canvas.requestPointerLock();
         }
@@ -1069,6 +1306,11 @@ function setupEventListeners() {
     document.getElementById('closeCardBtn').addEventListener('click', () => {
         document.getElementById('planetInfoCard').classList.remove('active');
         selectedObject = null;
+        
+        const cockpitLandBtn = document.getElementById('cockpit-land-btn');
+        if (cockpitLandBtn) cockpitLandBtn.style.display = 'none';
+        const cpTarget = document.getElementById('cp-target');
+        if (cpTarget) cpTarget.textContent = '---';
     });
 
     // Close kiosk modal
@@ -1231,11 +1473,22 @@ function showPlanetInfo(planet) {
     
     const landBtn = document.getElementById('land-btn');
     if (landBtn) {
-        landBtn.style.display = 'block';
+        landBtn.style.display = 'none'; // Hidden in favor of the cockpit land button
         landBtn.onclick = () => {
             initiateLanding(planet);
         };
     }
+    
+    const cockpitLandBtn = document.getElementById('cockpit-land-btn');
+    if (cockpitLandBtn) {
+        cockpitLandBtn.style.display = 'block';
+        cockpitLandBtn.onclick = () => {
+            initiateLanding(planet);
+        };
+    }
+
+    const cpTarget = document.getElementById('cp-target');
+    if (cpTarget) cpTarget.textContent = content.title.toUpperCase();
 }
 
 // ========================================
@@ -1367,29 +1620,36 @@ function createSurfaceEnvironment(planetData) {
     }
     roverScene.add(instancedMesh);
 
-    // Ambient Particles
-    const particleCount = 500;
+    // Ambient Particles (Dynamic Weather)
+    const particleCount = (biome === 'forest' || biome === 'ice') ? 1500 : 500;
     const particleGeo = new THREE.BufferGeometry();
     const particlePos = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
         particlePos[i*3] = (Math.random() - 0.5) * 400; // x
-        particlePos[i*3+1] = Math.random() * 60; // y
+        particlePos[i*3+1] = Math.random() * 100; // y
         particlePos[i*3+2] = (Math.random() - 0.5) * 400; // z
     }
     particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
     
     let particleColor = 0xffffff;
     let particleSize = 1;
-    if (biome === 'ice') { particleColor = 0xffffff; particleSize = 1.5; }
-    else if (biome === 'desert') { particleColor = 0xdab894; particleSize = 2; }
-    else if (biome === 'forest') { particleColor = 0xaaffaa; particleSize = 1.5; }
-    else if (biome === 'alien') { particleColor = 0xd400ff; particleSize = 2; }
+    let particleOpacity = 0.6;
+    
+    if (biome === 'ice') { 
+        particleColor = 0xffffff; particleSize = 1.5; particleOpacity = 0.8;
+    } else if (biome === 'desert') { 
+        particleColor = 0xdab894; particleSize = 2; particleOpacity = 0.4;
+    } else if (biome === 'forest') { 
+        particleColor = 0x88ccff; particleSize = 0.5; particleOpacity = 0.5; // Rain
+    } else if (biome === 'alien') { 
+        particleColor = 0xd400ff; particleSize = 2.5; particleOpacity = 0.8;
+    }
     
     const particleMat = new THREE.PointsMaterial({
         color: particleColor,
         size: particleSize,
         transparent: true,
-        opacity: 0.6,
+        opacity: particleOpacity,
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
@@ -1399,12 +1659,35 @@ function createSurfaceEnvironment(planetData) {
     surfaceParticleTime = 0;
 
     // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     roverScene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(100, 200, 50);
-    roverScene.add(dirLight);
+    surfaceSun = new THREE.DirectionalLight(0xffffff, 1.2);
+    surfaceSun.position.set(200, 300, 100); // Initial day position
+    surfaceSun.castShadow = true;
+    surfaceSun.shadow.mapSize.width = 2048;
+    surfaceSun.shadow.mapSize.height = 2048;
+    surfaceSun.shadow.camera.near = 0.5;
+    surfaceSun.shadow.camera.far = 1000;
+    surfaceSun.shadow.camera.left = -200;
+    surfaceSun.shadow.camera.right = 200;
+    surfaceSun.shadow.camera.top = 200;
+    surfaceSun.shadow.camera.bottom = -200;
+    roverScene.add(surfaceSun);
+    surfaceTime = Math.PI / 4; // Start at morning
+
+    // Asteroid field
+    const asteroids = new THREE.Group();
+    for (let i = 0; i < 30; i++) {
+        const geo = new THREE.IcosahedronGeometry(Math.random() * 5 + 2, 0);
+        const mat = new THREE.MeshStandardMaterial({color: 0x888888, flatShading: true});
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set((Math.random()-0.5)*1000, 100 + Math.random()*100, (Math.random()-0.5)*1000);
+        mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+        asteroids.add(mesh);
+    }
+    roverScene.add(asteroids);
+    roverScene.userData.asteroids = asteroids;
 
     // 3. Rover Mesh (Upgraded Design)
     rover = new THREE.Group();
@@ -1474,6 +1757,16 @@ function createSurfaceEnvironment(planetData) {
     const lens2 = new THREE.Mesh(lensGeo, lensMat);
     lens2.position.set(1.8, 4.8, -1.7);
     rover.add(lens2);
+
+    // Boost Flame
+    const flameGeo = new THREE.ConeGeometry(0.8, 3, 8);
+    const flameMat = new THREE.MeshBasicMaterial({color: 0x00ffff, transparent: true, opacity: 0.8});
+    const boostFlame = new THREE.Mesh(flameGeo, flameMat);
+    boostFlame.rotation.x = -Math.PI / 2;
+    boostFlame.position.set(0, 1.2, 4); // Rear of chassis
+    boostFlame.visible = false;
+    rover.add(boostFlame);
+    roverScene.userData.boostFlame = boostFlame;
 
     // Wheels, Hubcaps, and Suspension Arms
     const wheelGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 24);
@@ -1862,6 +2155,12 @@ function initiateLanding(planet) {
     controls.forward = false;
     controls.backward = false;
     document.getElementById('planetInfoCard').classList.remove('active');
+    
+    // Hide Space UI elements
+    const titleOverlay = document.querySelector('.title-overlay');
+    if (titleOverlay) titleOverlay.style.display = 'none';
+    const viewToggle = document.querySelector('.view-toggle');
+    if (viewToggle) viewToggle.style.display = 'none';
 
     // --- Cinematic Descent ---
     // Phase 1 (0-1.5s): Camera zooms toward planet surface
@@ -1892,6 +2191,9 @@ function initiateLanding(planet) {
     requestAnimationFrame(descentStep);
 
     function showSurface() {
+        // Hide cockpit
+        const cockpitBezel = document.getElementById('cockpit-bezel');
+        if (cockpitBezel) cockpitBezel.classList.add('hidden');
         // Hide solar system, show rover scene
         starSystems.forEach(system => system.group.visible = false);
         roverScene.visible = true;
@@ -1907,7 +2209,6 @@ function initiateLanding(planet) {
         roverLookPitch = 0;
 
         // Show rover HUD
-        document.querySelector('.view-toggle').style.display = 'none';
         const roverHud = document.getElementById('rover-hud');
         if (roverHud) {
             roverHud.style.display = 'flex';
@@ -1916,39 +2217,43 @@ function initiateLanding(planet) {
         }
 
         // Web Audio Ambient Drone
-        if (!audioCtx) {
+        if (!audioCtx && soundEnabled) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        
-        if (droneOsc) droneOsc.stop();
-        droneOsc = audioCtx.createOscillator();
-        droneGain = audioCtx.createGain();
-        droneFilter = audioCtx.createBiquadFilter();
+        if (soundEnabled && audioCtx) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            if (droneOsc) {
+                try { droneOsc.stop(); } catch(e) {}
+            }
+            droneOsc = audioCtx.createOscillator();
+            droneGain = audioCtx.createGain();
+            droneFilter = audioCtx.createBiquadFilter();
 
-        droneOsc.connect(droneFilter);
-        droneFilter.connect(droneGain);
-        droneGain.connect(audioCtx.destination);
+            droneOsc.connect(droneFilter);
+            droneFilter.connect(droneGain);
+            droneGain.connect(audioCtx.destination);
 
-        const biome = roverScene.userData.biome;
-        if (biome === 'desert') {
-            droneOsc.type = 'triangle'; droneOsc.frequency.value = 60;
-            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 200;
-        } else if (biome === 'ice') {
-            droneOsc.type = 'sine'; droneOsc.frequency.value = 300;
-            droneFilter.type = 'bandpass'; droneFilter.frequency.value = 800;
-        } else if (biome === 'forest') {
-            droneOsc.type = 'sine'; droneOsc.frequency.value = 150;
-            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 400;
-        } else if (biome === 'alien') {
-            droneOsc.type = 'sawtooth'; droneOsc.frequency.value = 80;
-            droneFilter.type = 'lowpass'; droneFilter.frequency.value = 300;
+            const biome = roverScene.userData.biome;
+            if (biome === 'desert') {
+                droneOsc.type = 'triangle'; droneOsc.frequency.value = 60;
+                droneFilter.type = 'lowpass'; droneFilter.frequency.value = 200;
+            } else if (biome === 'ice') {
+                droneOsc.type = 'sine'; droneOsc.frequency.value = 300;
+                droneFilter.type = 'bandpass'; droneFilter.frequency.value = 800;
+            } else if (biome === 'forest') {
+                droneOsc.type = 'sine'; droneOsc.frequency.value = 150;
+                droneFilter.type = 'lowpass'; droneFilter.frequency.value = 400;
+            } else if (biome === 'alien') {
+                droneOsc.type = 'sawtooth'; droneOsc.frequency.value = 80;
+                droneFilter.type = 'lowpass'; droneFilter.frequency.value = 300;
+            }
+
+            droneGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            droneGain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 2);
+            droneOsc.start();
         }
-
-        droneGain.gain.setValueAtTime(0, audioCtx.currentTime);
-        droneGain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 2);
-        droneOsc.start();
-
+        
         // Phase 3: Dropship Cinematic Landing
         isLandingAnim = true;
         
@@ -2040,7 +2345,16 @@ function returnToOrbit() {
     // Fade out drone
     if (droneGain && audioCtx) {
         droneGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
-        setTimeout(() => { if (droneOsc) { droneOsc.stop(); droneOsc = null; } }, 1500);
+        setTimeout(() => { 
+            if (droneOsc) { 
+                try { droneOsc.stop(); droneOsc.disconnect(); } catch(e) {} 
+                droneOsc = null; 
+            }
+            if (droneFilter) {
+                try { droneFilter.disconnect(); } catch(e) {}
+                droneFilter = null;
+            }
+        }, 1500);
     }
 
     // --- Cinematic Launch Sequence ---
@@ -2081,10 +2395,13 @@ function returnToOrbit() {
 
         // Restore space environment
         scene.background = null;
-        scene.fog = new THREE.FogExp2(0x000000, 0.0005);
-
-        // Show solar system
+        scene.fog.color.setHex(0x000000);
+        scene.fog.density = 0.0005;
         starSystems.forEach(system => system.group.visible = true);
+        
+        // Show cockpit
+        const cockpitBezel = document.getElementById('cockpit-bezel');
+        if (cockpitBezel) cockpitBezel.classList.remove('hidden');
 
         // Position camera back at a safe distance from where we landed
         if (currentPlanetData) {
@@ -2100,12 +2417,20 @@ function returnToOrbit() {
                 planetGroup.getWorldPosition(worldPos);
                 const dir = worldPos.clone().normalize().negate();
                 camera3D.position.copy(worldPos).add(dir.multiplyScalar(60));
+                
+                // Align camera pitch/yaw to look at planet
                 camera3D.lookAt(0, 0, 0);
+                const euler = new THREE.Euler().setFromQuaternion(camera3D.quaternion, 'YXZ');
+                shipPitch = euler.x;
+                shipYaw = euler.y;
             }
         }
 
-        // Hide rover HUD, show view toggle
+        // Restore UI
         document.querySelector('.view-toggle').style.display = 'flex';
+        const titleOverlay = document.querySelector('.title-overlay');
+        if (titleOverlay) titleOverlay.style.display = 'block';
+        
         const roverHud = document.getElementById('rover-hud');
         if (roverHud) roverHud.style.display = 'none';
         const approachEl = document.getElementById('planet-approach-hud');
@@ -2113,7 +2438,9 @@ function returnToOrbit() {
 
         // Clear surface to free memory
         while (roverScene.children.length > 0) {
-            roverScene.remove(roverScene.children[0]);
+            const child = roverScene.children[0];
+            roverScene.remove(child);
+            disposeHierarchy(child);
         }
         rover = null;
         launchPad = null;
@@ -2131,3 +2458,43 @@ function returnToOrbit() {
 // ========================================
 
 init();
+
+// ========================================
+// Memory Management
+// ========================================
+function disposeHierarchy(node) {
+    if (!node) return;
+    if (node.geometry) {
+        node.geometry.dispose();
+    }
+    if (node.material) {
+        if (Array.isArray(node.material)) {
+            node.material.forEach(m => disposeMaterial(m));
+        } else {
+            disposeMaterial(node.material);
+        }
+    }
+    while (node.children.length > 0) {
+        const child = node.children[0];
+        node.remove(child);
+        disposeHierarchy(child);
+    }
+}
+
+function disposeMaterial(mat) {
+    if (!mat) return;
+    if (mat.map) mat.map.dispose();
+    if (mat.lightMap) mat.lightMap.dispose();
+    if (mat.bumpMap) mat.bumpMap.dispose();
+    if (mat.normalMap) mat.normalMap.dispose();
+    if (mat.specularMap) mat.specularMap.dispose();
+    if (mat.envMap) mat.envMap.dispose();
+    if (mat.alphaMap) mat.alphaMap.dispose();
+    if (mat.aoMap) mat.aoMap.dispose();
+    if (mat.displacementMap) mat.displacementMap.dispose();
+    if (mat.emissiveMap) mat.emissiveMap.dispose();
+    if (mat.gradientMap) mat.gradientMap.dispose();
+    if (mat.metalnessMap) mat.metalnessMap.dispose();
+    if (mat.roughnessMap) mat.roughnessMap.dispose();
+    mat.dispose();
+}
